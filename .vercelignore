@@ -18,6 +18,8 @@ bot/
 # Development-only verification and documentation
 docs/
 verify/
+scripts/
+content-source/
 AGENTS.md
 README.md
 *.md

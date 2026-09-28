@@ -175,6 +175,7 @@ module.exports = {
       );
       const requiredIgnoreEntries = [
         '.agents/', '.claude/', 'bot/', 'docs/', 'verify/',
+        'scripts/', 'content-source/',
         '**/.env', '**/.env.*', 'man_videos/*', 'woman_videos/*',
       ];
       for (const entry of requiredIgnoreEntries) {

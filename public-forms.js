@@ -341,11 +341,23 @@
   function setSubmitting(form, submitting) {
     form.setAttribute('aria-busy', String(submitting));
     form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
-      button.disabled = submitting;
+      button.disabled = submitting || (form.dataset.requiresPublicClient === 'true' && form.dataset.publicRequestUnavailable === 'true');
+    });
+  }
+
+  function pauseUnavailableSubmit(form) {
+    if (form.dataset.disableAfterFailure !== 'true') return;
+    form.dataset.publicRequestUnavailable = 'true';
+    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
+      button.disabled = true;
     });
   }
 
   async function submitRequest(form) {
+    if (form.dataset.publicRequestUnavailable === 'true') {
+      setStatus(form, 'Online submission is disabled because the public request service is not configured on this page. Check back after it is activated.', 'error');
+      return;
+    }
     if (!form.reportValidity()) return;
 
     let request;
@@ -360,6 +372,7 @@
     hideFallback(form);
 
     if (!navigator.onLine || !window.supabaseClient) {
+      pauseUnavailableSubmit(form);
       setStatus(form, 'We could not send this request right now. Your draft is saved.', 'error');
       showFallback(form, request);
       return;
@@ -377,7 +390,10 @@
       setStatus(form, 'Thank you. Your request has been received and queued for the Lumeya contact.', 'success');
     } catch (error) {
       console.warn('[PublicForms] Request submission failed:', error?.message || error);
-      setStatus(form, 'We could not send this request right now. Your draft is saved.', 'error');
+      pauseUnavailableSubmit(form);
+      setStatus(form, form.dataset.disableAfterFailure === 'true'
+        ? 'Online submission has been paused after a failed request. Your draft is saved; you can choose a manual option below.'
+        : 'We could not send this request right now. Your draft is saved.', 'error');
       showFallback(form, request);
     } finally {
       setSubmitting(form, false);
@@ -387,10 +403,31 @@
   function initForm(form) {
     if (form.dataset.publicRequestReady === 'true') return;
     form.dataset.publicRequestReady = 'true';
+    let updateRouteAvailability = null;
+    if (form.dataset.requiresPublicClient === 'true') {
+      updateRouteAvailability = function () {
+        const available = navigator.onLine && window.supabaseClient && typeof window.supabaseClient.rpc === 'function';
+        form.dataset.publicRequestUnavailable = String(!available);
+        form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
+          button.disabled = !available;
+        });
+        if (!available) {
+          setStatus(form, 'Online submission is disabled because the public request service is not configured on this page. Check back after it is activated.', 'error');
+        } else if (form.dataset.publicRequestUnavailable === 'false' && form.dataset.routeWasUnavailable === 'true') {
+          setStatus(form, 'Online submission is available.', 'success');
+        } else if (form.querySelector('[data-form-status]')?.textContent === 'Checking online request availability…') {
+          setStatus(form, 'Online submission is configured here. Requests still depend on the public service being available.', 'success');
+        }
+        form.dataset.routeWasUnavailable = String(!available);
+      };
+      window.addEventListener('online', updateRouteAvailability);
+      window.addEventListener('offline', updateRouteAvailability);
+    }
     if (restoreDraft(form)) {
       setStatus(form, 'Draft restored from this browser.', 'draft');
     }
     prefillFromLocation(form);
+    if (updateRouteAvailability) updateRouteAvailability();
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();

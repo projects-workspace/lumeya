@@ -43,7 +43,7 @@
   function linkedFact(label, records, labelField, urlField) {
     if (!records.length) return '';
     var links = records.map(function (record) {
-      var url = safeUrl(record[urlField]);
+      var url = safeUrl(record[urlField] || (urlField === 'profileUrl' ? record.detailUrl : ''));
       return url
         ? '<a href="' + escapeHtml(url) + '">' + escapeHtml(record[labelField]) + '</a>'
         : '<span>' + escapeHtml(record[labelField]) + '</span>';
@@ -66,7 +66,7 @@
 
   function renderFormatCard(format, data) {
     var topics = data.related(format, 'topics', 'topicIds');
-    var practitioners = data.related(format, 'practitioners', 'practitionerIds');
+    var providers = data.related(format, 'providers', 'providerIds');
     var places = data.related(format, 'places', 'placeIds');
     var services = data.related(format, 'services', 'serviceIds');
     var titleId = 'format-' + escapeHtml(format.id) + '-title';
@@ -82,7 +82,7 @@
         fact('Location', format.location) +
         fact('Organiser', format.organizer) +
         fact('Date', 'No scheduled date published') +
-        linkedFact('People', practitioners, 'name', 'profileUrl') +
+        linkedFact('Providers', providers, 'name', 'profileUrl') +
         linkedFact('Places', places, 'name', 'detailUrl') +
         linkedFact('Services', services, 'title', 'detailUrl') +
       '</dl>' +
@@ -91,7 +91,7 @@
   }
 
   function scheduledDate(eventRecord) {
-    var raw = eventRecord.start || eventRecord.startAt || eventRecord.date || '';
+    var raw = eventRecord.start || eventRecord.startAt || eventRecord.start_time || eventRecord.date || '';
     if (!raw) return 'Not published';
     var date = new Date(raw);
     if (Number.isNaN(date.getTime())) return String(raw);
@@ -109,7 +109,7 @@
     var id = eventRecord.id || normalize(eventRecord.title);
     var titleId = 'scheduled-event-' + escapeHtml(id) + '-title';
     return '<article class="entity-card" data-scheduled-event-id="' + escapeHtml(id) + '" aria-labelledby="' + titleId + '">' +
-      '<div class="entity-card__topline"><span class="status-pill">Verified scheduled event</span></div>' +
+      '<div class="entity-card__topline"><span class="status-pill">Scheduled event</span></div>' +
       '<h3 id="' + titleId + '">' + escapeHtml(eventRecord.title || 'Scheduled event') + '</h3>' +
       (eventRecord.description ? '<p>' + escapeHtml(eventRecord.description) + '</p>' : '') +
       '<dl class="entity-card__facts">' +
@@ -129,18 +129,22 @@
     return status;
   }
 
-  function formatCategory(format) {
-    var topics = format.topicIds || [];
-    if (topics.indexOf('relationships') !== -1) return 'relationships';
-    if (topics.indexOf('media') !== -1) return 'media';
-    if (topics.indexOf('business') !== -1) return 'projects';
-    return 'community';
+  function formatCategoryIds(format, data) {
+    return (format.topicIds || []).map(function (id) {
+      var topic = data.getById('topics', id);
+      return topic && topic.categoryId;
+    }).filter(Boolean);
   }
 
   function boot() {
-    if (initialized || !root.LumeyaData) return;
+    if (initialized) return;
     var formatsGrid = document.getElementById('formats-grid') || document.getElementById('events-grid');
     if (!formatsGrid) return;
+    if (!root.LumeyaData) {
+      var missingDataState = document.getElementById('event-formats-unavailable');
+      if (missingDataState) missingDataState.hidden = false;
+      return;
+    }
     initialized = true;
 
     var data = root.LumeyaData;
@@ -153,10 +157,21 @@
     var ownerFilter = document.querySelector('#events-owner-filter, [data-event-filter="owner"]');
     var sortControl = document.getElementById('events-sort');
     var reset = document.querySelector('#events-reset-filters, #reset-event-filters');
+    var categoryOptions = data.categories || [];
+    var params = new URLSearchParams(root.location.search);
+    if (search && !search.value) search.value = params.get('q') || params.get('search') || '';
+    if (categoryFilter && categoryFilter.options.length <= 1) {
+      categoryOptions.forEach(function (category) {
+        var option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.label;
+        categoryFilter.appendChild(option);
+      });
+    }
 
     function formatText(format) {
       var topics = data.related(format, 'topics', 'topicIds').map(function (topic) { return topic.label; });
-      var people = data.related(format, 'practitioners', 'practitionerIds').map(function (person) { return person.name; });
+      var people = data.related(format, 'providers', 'providerIds').map(function (provider) { return provider.name; });
       return normalize([
         format.title,
         format.description,
@@ -176,7 +191,7 @@
       var owner = normalize(ownerFilter && ownerFilter.value);
       var visible = data.eventFormats.filter(function (format) {
         return (!query || formatText(format).indexOf(query) !== -1) &&
-          (!category || category === 'all' || formatCategory(format) === category) &&
+          (!category || category === 'all' || formatCategoryIds(format, data).indexOf(category) !== -1) &&
           (!selectedStatus || selectedStatus === 'all' || legacyStatus(format) === selectedStatus) &&
           (!owner || owner === 'all' || normalize(format.organizer).indexOf(owner) !== -1);
       });
@@ -184,11 +199,24 @@
       if (sortControl && sortControl.value === 'title') {
         visible.sort(function (a, b) { return a.title.localeCompare(b.title); });
       } else if (sortControl && sortControl.value === 'owner') {
-        visible.sort(function (a, b) { return a.organizer.localeCompare(b.organizer); });
+        visible.sort(function (a, b) { return String(a.organizer || '').localeCompare(String(b.organizer || '')); });
       }
 
       formatsGrid.innerHTML = visible.map(function (format) { return renderFormatCard(format, data); }).join('');
-      if (empty) empty.hidden = visible.length !== 0;
+      if (empty) {
+        empty.hidden = visible.length !== 0;
+        var title = empty.querySelector('strong');
+        var description = empty.querySelector('[data-empty-description]');
+        if (!visible.length && title && description) {
+          if (!data.eventFormats.length) {
+            title.textContent = 'No published event formats yet';
+            description.textContent = 'Browse services and places, or introduce a real event format for curation.';
+          } else {
+            title.textContent = 'No event formats match these filters';
+            description.textContent = 'Clear the filters or broaden your search. Undated formats remain separate from scheduled events.';
+          }
+        }
+      }
     }
 
     function setScheduleState(status, events, message) {
@@ -210,7 +238,7 @@
         state.innerHTML = '<strong>Loading scheduled events</strong><span>Checking the live event source.</span>';
       } else if (status === 'ready') {
         state.classList.add('state-card--success');
-        state.innerHTML = '<strong>No verified scheduled events are published</strong><span>Event formats below are ideas or request-based formats, not confirmed dates.</span>';
+        state.innerHTML = '<strong>No upcoming scheduled events are currently published</strong><span>Event formats below are undated ideas or request-based formats, not confirmed dates.</span>';
       } else {
         state.classList.add('state-card--unavailable');
         state.innerHTML = '<strong>Events temporarily unavailable</strong><span>' + escapeHtml(message || 'The live event source is not connected. Event formats below remain available for discovery.') + '</span>';

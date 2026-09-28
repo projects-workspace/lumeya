@@ -2,7 +2,6 @@
   'use strict';
 
   const track = document.getElementById('home-events-track');
-  if (!track) return;
 
   const sb = window.supabaseClient;
   const DEFAULT_LANG = 'en';
@@ -100,10 +99,9 @@
     }).join('');
   }
 
-  async function loadEvents() {
+  async function fetchUpcomingEvents() {
     if (!sb) {
-      renderUnavailable();
-      return;
+      throw new Error('public_event_source_unavailable');
     }
 
     const now = new Date();
@@ -127,17 +125,46 @@
         .filter(event => new Date(event.start_time) >= now)
         .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
-      renderEvents(upcoming);
+      return upcoming;
     } catch (err) {
       console.warn('[HomeEvents] Could not load events:', err);
-      renderUnavailable();
+      throw err;
     }
   }
 
-  document.addEventListener('ma3-auth-changed', loadEvents);
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadEvents);
-  } else {
-    loadEvents();
+  function publicEventRecord(event) {
+    return {
+      id: event.id,
+      title: event.title,
+      description: event.description || '',
+      start_time: event.start_time,
+      end_time: event.end_time,
+      location: event.location || event.address || [event.city, event.country].filter(Boolean).join(', ') || '',
+      organizer: event.organizer || event.organizer_name || '',
+      status: event.status || '',
+      url: event.public_url || event.url || ''
+    };
+  }
+
+  window.LumeyaEventsProvider = {
+    load: () => fetchUpcomingEvents().then(events => events.map(publicEventRecord))
+  };
+
+  async function loadHomeEvents() {
+    try {
+      const events = await fetchUpcomingEvents();
+      if (track) renderEvents(events);
+    } catch (err) {
+      if (track) renderUnavailable();
+    }
+  }
+
+  if (track) {
+    document.addEventListener('ma3-auth-changed', loadHomeEvents);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadHomeEvents, { once: true });
+    } else {
+      loadHomeEvents();
+    }
   }
 })();

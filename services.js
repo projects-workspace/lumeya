@@ -56,7 +56,7 @@
   }
 
   function renderCard(service, data) {
-    var practitioners = data.related(service, 'practitioners', 'practitionerIds');
+    var providers = data.related(service, 'providers', 'providerIds');
     var places = data.related(service, 'places', 'placeIds');
     var formats = data.related(service, 'eventFormats', 'eventFormatIds');
     var topics = data.related(service, 'topics', 'topicIds');
@@ -71,6 +71,11 @@
     if (contactUrl) {
       links.push('<a class="button button--primary" href="' + escapeHtml(contactUrl) + '"' + newTabAttributes(contactUrl) + ' aria-label="' + escapeHtml(service.contactLabel + ' about ' + service.title) + '">' + escapeHtml(service.contactLabel) + '</a>');
     }
+    var providerRow = providers.length
+      ? relationshipRow('Provider', providers.map(function (record) {
+        return recordLink(record, 'name', record.profileUrl ? 'profileUrl' : 'detailUrl');
+      }))
+      : fact('Provider', service.provider);
 
     return '<article class="entity-card" data-service-id="' + escapeHtml(service.id) + '" aria-labelledby="' + titleId + '">' +
       '<div class="entity-card__visual" aria-hidden="true">' + escapeHtml(initials(service.title)) + '</div>' +
@@ -83,8 +88,7 @@
         fact('Duration', service.duration) +
         fact('Delivery', service.delivery) +
         fact('Location', service.location) +
-        fact('Provider', service.provider) +
-        relationshipRow('Practitioner', practitioners.map(function (record) { return recordLink(record, 'name', 'profileUrl'); })) +
+        providerRow +
         relationshipRow('Place', places.map(function (record) { return recordLink(record, 'name', 'detailUrl'); })) +
         relationshipRow('Event format', formats.map(function (record) { return recordLink(record, 'title', 'detailUrl'); })) +
       '</dl>' +
@@ -92,12 +96,11 @@
     '</article>';
   }
 
-  function serviceCategory(service) {
-    var topics = service.topicIds || [];
-    if (topics.some(function (id) { return ['bodywork', 'rehabilitation', 'wellness', 'aromatherapy'].indexOf(id) !== -1; })) return 'body';
-    if (topics.some(function (id) { return ['mind-body', 'lila', 'relationships', 'personal-development'].indexOf(id) !== -1; })) return 'mind';
-    if (topics.some(function (id) { return ['media', 'business', 'community'].indexOf(id) !== -1; })) return 'incubator';
-    return 'other';
+  function serviceCategoryIds(service, data) {
+    return (service.topicIds || []).map(function (id) {
+      var topic = data.getById('topics', id);
+      return topic && topic.categoryId;
+    }).filter(Boolean);
   }
 
   function matchesStatus(service, value) {
@@ -115,13 +118,19 @@
   }
 
   function boot() {
-    if (initialized || !root.LumeyaData) return;
+    if (initialized) return;
     var grid = document.getElementById('services-grid');
     if (!grid) return;
+    if (!root.LumeyaData) {
+      var unavailable = document.getElementById('services-data-unavailable');
+      if (unavailable) unavailable.hidden = false;
+      return;
+    }
     initialized = true;
 
     var data = root.LumeyaData;
     var services = data.services.slice();
+    var categories = data.categories || [];
     var search = document.querySelector('#services-search, #service-search, [data-discovery-search="services"]');
     var statusFilter = document.querySelector('#services-status-filter, [data-service-filter="status"]');
     var formatFilter = document.querySelector('#services-format-filter, [data-service-filter="format"]');
@@ -131,10 +140,16 @@
     var reset = document.querySelector('#services-reset-filters, #reset-filters');
     var empty = document.getElementById('services-empty');
     var count = document.querySelector('#services-results-count, [data-results-count="services"]');
-    var category = 'all';
+    var categoryHost = document.getElementById('services-categories');
+    var params = new URLSearchParams(root.location.search);
+    var requestedCategory = params.get('category') || 'all';
+    var category = categories.some(function (item) { return item.id === requestedCategory; }) ? requestedCategory : 'all';
+    if (search && !search.value) search.value = params.get('q') || params.get('search') || '';
+    var emptyTitle = empty && empty.querySelector('strong');
+    var emptyDescription = empty && empty.querySelector('[data-empty-description]');
 
     function searchText(service) {
-      var relatedNames = data.related(service, 'practitioners', 'practitionerIds').map(function (record) { return record.name; });
+      var relatedNames = data.related(service, 'providers', 'providerIds').map(function (record) { return record.name; });
       var topicNames = data.related(service, 'topics', 'topicIds').map(function (record) { return record.label; });
       return normalize([
         service.title,
@@ -155,24 +170,62 @@
       var format = formatFilter ? formatFilter.value : 'all';
       var provider = normalize(providerFilter && providerFilter.value);
       var visible = services.filter(function (service) {
-        var providerText = normalize(service.provider + ' ' + service.practitionerIds.join(' '));
+        var providerText = normalize((service.provider || '') + ' ' + (service.providerIds || service.practitionerIds || []).join(' '));
         var matchesProvider = !provider || provider === 'all' || providerText.indexOf(provider) !== -1;
         return (!query || searchText(service).indexOf(query) !== -1) &&
           matchesStatus(service, status) &&
           matchesFormat(service, format) &&
           matchesProvider &&
-          (category === 'all' || serviceCategory(service) === category);
+          (category === 'all' || serviceCategoryIds(service, data).indexOf(category) !== -1);
       });
 
       if (sortControl && sortControl.value === 'title') {
         visible.sort(function (a, b) { return a.title.localeCompare(b.title); });
       } else if (sortControl && sortControl.value === 'provider') {
-        visible.sort(function (a, b) { return a.provider.localeCompare(b.provider); });
+        visible.sort(function (a, b) { return String(a.provider || '').localeCompare(String(b.provider || '')); });
       }
 
       grid.innerHTML = visible.map(function (service) { return renderCard(service, data); }).join('');
-      if (empty) empty.hidden = visible.length !== 0;
+      if (empty) {
+        empty.hidden = visible.length !== 0;
+        if (!visible.length && emptyTitle && emptyDescription) {
+          var selectedCategory = categories.find(function (item) { return item.id === category; });
+          var hasOtherFilters = Boolean(query || status !== 'all' || format !== 'all' || (providerFilter && providerFilter.value !== 'all'));
+          if (!services.length) {
+            emptyTitle.textContent = 'No published services yet';
+            emptyDescription.textContent = 'Browse practitioners and places, or invite a provider to introduce a real service.';
+          } else if (selectedCategory && !hasOtherFilters) {
+            emptyTitle.textContent = 'No published services in ' + selectedCategory.label + ' yet';
+            emptyDescription.textContent = 'This category is ready for relevant work. Browse all services or invite a provider to share an offer.';
+          } else {
+            emptyTitle.textContent = 'No services match these filters';
+            emptyDescription.textContent = 'Clear the filters or try a broader search across published service information.';
+          }
+        }
+      }
       if (count) count.textContent = visible.length + (visible.length === 1 ? ' service' : ' services');
+    }
+
+    function updateCategoryButtons() {
+      if (!categoryHost) return;
+      categoryHost.querySelectorAll('[data-service-category]').forEach(function (button) {
+        button.setAttribute('aria-pressed', String(button.getAttribute('data-service-category') === category));
+      });
+    }
+
+    function renderCategoryButtons() {
+      if (!categoryHost) return;
+      var items = [{ id: 'all', label: 'All services', description: 'Browse every published service.' }].concat(categories);
+      categoryHost.innerHTML = items.map(function (item) {
+        var available = item.id === 'all' || services.some(function (service) {
+          return serviceCategoryIds(service, data).indexOf(item.id) !== -1;
+        });
+        var description = item.description || 'Browse published services in this category.';
+        var availability = item.id === 'all' ? '' : '<span class="category-card__status">' +
+          (available ? 'Published service entries are listed' : 'No published services in this category yet') + '</span>';
+        return '<article class="category-card"><h3>' + escapeHtml(item.label) + '</h3><p>' + escapeHtml(description) + '</p>' +
+          availability + '<button class="button category-card__action" type="button" data-service-category="' + escapeHtml(item.id) + '" aria-pressed="' + String(item.id === category) + '">Browse ' + escapeHtml(item.label) + '</button></article>';
+      }).join('');
     }
 
     [search, statusFilter, formatFilter, providerFilter, sortControl].forEach(function (control) {
@@ -193,6 +246,17 @@
           item.classList.toggle('active', active);
           item.setAttribute('aria-selected', String(active));
         });
+        updateCategoryButtons();
+        render();
+      });
+    }
+
+    if (categoryHost) {
+      categoryHost.addEventListener('click', function (event) {
+        var button = event.target.closest && event.target.closest('[data-service-category]');
+        if (!button) return;
+        category = button.getAttribute('data-service-category') || 'all';
+        updateCategoryButtons();
         render();
       });
     }
@@ -205,11 +269,14 @@
         if (providerFilter) providerFilter.value = 'all';
         if (sortControl) sortControl.value = 'default';
         category = 'all';
+        updateCategoryButtons();
         render();
         if (search) search.focus();
       });
     }
 
+    renderCategoryButtons();
+    updateCategoryButtons();
     render();
   }
 

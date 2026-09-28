@@ -5,9 +5,10 @@
     ['index.html', 'Discover'],
     ['services.html', 'Services'],
     ['masters.html', 'Practitioners'],
-    ['map.html', 'Map'],
+    ['map.html', 'Places & map'],
     ['events.html', 'Events'],
-    ['about.html', 'About']
+    ['about.html', 'About'],
+    ['join.html', 'Join Lumeya']
   ];
 
   function currentPage() {
@@ -68,7 +69,7 @@
         <button class="menu-close" type="button" aria-label="Close menu">×</button>
       </div>
       <ul>${navList()}</ul>
-      <a class="quick-menu__action" href="suggest.html">Suggest a listing or tell us what you need</a>`;
+      <a class="quick-menu__action" href="join.html">Join Lumeya</a>`;
     menu.hidden = true;
     menu.inert = true;
 

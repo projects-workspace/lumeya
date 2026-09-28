@@ -18,6 +18,7 @@ const publicPages = [
   'calendar.html',
   'masters.html',
   'services.html',
+  'join.html',
   'space.html',
   'projects.html',
   'community.html',
@@ -52,15 +53,17 @@ const coreDiscoveryPages = [
   'events.html',
   'about.html',
   'suggest.html',
+  'join.html',
 ];
 
 const primaryNavigation = [
   { href: 'index.html', label: 'Discover' },
   { href: 'services.html', label: 'Services' },
   { href: 'masters.html', label: 'Practitioners' },
-  { href: 'map.html', label: 'Map' },
+  { href: 'map.html', label: 'Places & map' },
   { href: 'events.html', label: 'Events' },
   { href: 'about.html', label: 'About' },
+  { href: 'join.html', label: 'Join Lumeya' },
 ];
 
 const publicProfilePages = [
@@ -81,18 +84,24 @@ const requiredFiles = [
   'public-config.js',
   'public-forms.js',
   'discovery-data.js',
+  'home-discovery.js',
+  'home-events.js',
+  'scripts/catalog.js',
+  'content-source/published/catalog.json',
   'profile-enhancements.js',
   'map.js',
   '.vercelignore',
 ];
 
 const requiredPageScripts = {
+  'index.html': ['discovery-data.js', 'home-discovery.js'],
   'map.html': ['discovery-data.js', 'map.js'],
   'suggest.html': ['public-forms.js'],
   'services.html': ['discovery-data.js', 'services.js'],
   'masters.html': ['discovery-data.js', 'masters.js'],
   'space.html': ['discovery-data.js', 'spaces.js'],
-  'events.html': ['discovery-data.js', 'events.js'],
+  'events.html': ['discovery-data.js', 'home-events.js', 'events.js', 'public-config.js'],
+  'join.html': ['public-config.js', 'public-forms.js'],
   'profile.html': ['discovery-data.js', 'profile-enhancements.js'],
   'profile-andrij.html': ['discovery-data.js', 'profile-enhancements.js'],
   'profile-katerina.html': ['discovery-data.js', 'profile-enhancements.js'],
@@ -100,10 +109,14 @@ const requiredPageScripts = {
 };
 
 const requiredPageIds = {
-  'services.html': ['services-grid'],
+  'index.html': ['home-discovery-search', 'home-categories', 'home-events-track'],
+  'services.html': ['services-categories', 'services-grid', 'services-data-unavailable'],
   'masters.html': ['masters-grid'],
   'space.html': ['spaces-grid'],
-  'events.html': ['formats-grid', 'scheduled-events', 'events-state'],
+  'events.html': ['formats-grid', 'scheduled-events', 'events-state', 'events-search', 'events-reset-filters'],
+  'map.html': ['map-search', 'map-status', 'map-list-panel', 'show-list-view'],
+  'masters.html': ['masters-grid', 'masters-data-unavailable'],
+  'join.html': ['join-form', 'join-listing-type', 'join-details', 'join-contact'],
   'profile.html': ['profile-discovery-data'],
   'profile-andrij.html': ['profile-discovery-data'],
   'profile-katerina.html': ['profile-discovery-data'],
@@ -118,6 +131,8 @@ const keyAssets = [
   'translations.js',
   'auth.js',
   'public-config.js',
+  'home-events.js',
+  'home-discovery.js',
   'public-forms.js',
   'discovery-data.js',
   'profile-enhancements.js',

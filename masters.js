@@ -69,8 +69,12 @@
     var places = data.related(practitioner, 'places', 'placeIds');
     var formats = data.related(practitioner, 'eventFormats', 'eventFormatIds');
     var profileUrl = safeUrl(practitioner.profileUrl);
+    profileUrl = profileUrl || safeUrl(practitioner.detailUrl);
     var contactUrl = safeUrl(practitioner.contactUrl);
     var titleId = 'practitioner-' + escapeHtml(practitioner.id) + '-title';
+    var typeLabel = practitioner.type === 'organisation' ? 'Organisation' : 'Practitioner';
+    var fields = Array.isArray(practitioner.fields) ? practitioner.fields : [];
+    var languages = Array.isArray(practitioner.languages) ? practitioner.languages : [];
     var actions = [];
 
     if (profileUrl) {
@@ -82,14 +86,14 @@
 
     return '<article class="entity-card" data-practitioner-id="' + escapeHtml(practitioner.id) + '" aria-labelledby="' + titleId + '">' +
       visual(practitioner) +
-      '<div class="entity-card__topline"><span class="status-pill">Practitioner</span><span class="entity-tag">' + escapeHtml(practitioner.city || practitioner.location) + '</span></div>' +
+      '<div class="entity-card__topline"><span class="status-pill">' + typeLabel + '</span><span class="entity-tag">' + escapeHtml(practitioner.city || practitioner.location) + '</span></div>' +
       '<h2 id="' + titleId + '">' + escapeHtml(practitioner.name) + '</h2>' +
       '<p>' + escapeHtml(practitioner.shortDescription) + '</p>' +
-      '<div class="tag-list" aria-label="Fields">' + practitioner.fields.map(function (field) { return '<span class="entity-tag">' + escapeHtml(field) + '</span>'; }).join('') + '</div>' +
+      '<div class="tag-list" aria-label="Fields">' + fields.map(function (field) { return '<span class="entity-tag">' + escapeHtml(field) + '</span>'; }).join('') + '</div>' +
       '<dl class="entity-card__facts">' +
         fact('Approach', practitioner.approach) +
         fact('Location', practitioner.location) +
-        fact('Languages', practitioner.languages.length ? practitioner.languages.join(', ') : 'Not published') +
+        fact('Languages', languages.length ? languages.join(', ') : 'Not published') +
         fact('Online', practitioner.onlineAvailability) +
         fact('Experience', practitioner.experience) +
         (practitioner.image ? fact('Photo', 'Provider supplied') : '') +
@@ -104,8 +108,8 @@
   function populateTopics(select, data) {
     if (!select || select.options.length > 1) return;
     var used = {};
-    data.practitioners.forEach(function (record) {
-      record.topicIds.forEach(function (id) { used[id] = true; });
+    (data.providers || data.practitioners).forEach(function (record) {
+      (record.topicIds || []).forEach(function (id) { used[id] = true; });
     });
     data.topics.forEach(function (topic) {
       if (!used[topic.id]) return;
@@ -117,18 +121,40 @@
   }
 
   function boot() {
-    if (initialized || !root.LumeyaData) return;
+    if (initialized) return;
     var grid = document.getElementById('masters-grid');
     if (!grid) return;
+    if (!root.LumeyaData) {
+      var unavailable = document.getElementById('masters-data-unavailable');
+      if (unavailable) unavailable.hidden = false;
+      return;
+    }
     initialized = true;
 
     var data = root.LumeyaData;
+    var providers = data.providers || data.practitioners || [];
     var search = document.querySelector('#masters-search, #practitioners-search, [data-discovery-search="practitioners"]');
     var cityFilter = document.querySelector('#masters-city-filter, [data-practitioner-filter="city"]');
     var topicFilter = document.querySelector('#masters-topic-filter, [data-practitioner-filter="topic"]');
     var empty = document.getElementById('masters-empty');
     var reset = document.querySelector('#masters-reset-filters, #reset-master-filters');
     var count = document.querySelector('#masters-results-count, [data-results-count="practitioners"]');
+    var emptyTitle = empty && empty.querySelector('strong');
+    var emptyDescription = empty && empty.querySelector('[data-empty-description]');
+    var params = new URLSearchParams(root.location.search);
+    if (search && !search.value) search.value = params.get('q') || params.get('search') || '';
+
+    if (cityFilter) {
+      var knownCities = new Set(Array.from(cityFilter.options).map(function (option) { return option.value; }));
+      Array.from(new Set(providers.map(function (record) { return record.city; }).filter(Boolean))).sort().forEach(function (city) {
+        var value = normalize(city);
+        if (knownCities.has(value)) return;
+        var option = document.createElement('option');
+        option.value = value;
+        option.textContent = city;
+        cityFilter.appendChild(option);
+      });
+    }
 
     populateTopics(topicFilter, data);
 
@@ -139,9 +165,9 @@
         practitioner.name,
         practitioner.shortDescription,
         practitioner.approach,
-        practitioner.fields.join(' '),
+        (practitioner.fields || []).join(' '),
         practitioner.location,
-        practitioner.languages.join(' '),
+        (practitioner.languages || []).join(' '),
         topicLabels.join(' '),
         serviceTitles.join(' ')
       ].join(' '));
@@ -151,15 +177,26 @@
       var query = normalize(search && search.value);
       var city = normalize(cityFilter && cityFilter.value);
       var topic = topicFilter ? topicFilter.value : 'all';
-      var visible = data.practitioners.filter(function (practitioner) {
+      var visible = providers.filter(function (practitioner) {
         return (!query || haystack(practitioner).indexOf(query) !== -1) &&
           (!city || city === 'all' || normalize(practitioner.city) === city) &&
-          (!topic || topic === 'all' || practitioner.topicIds.indexOf(topic) !== -1);
+          (!topic || topic === 'all' || (practitioner.topicIds || []).indexOf(topic) !== -1);
       });
 
       grid.innerHTML = visible.map(function (practitioner) { return renderCard(practitioner, data); }).join('');
-      if (empty) empty.hidden = visible.length !== 0;
-      if (count) count.textContent = visible.length + (visible.length === 1 ? ' practitioner' : ' practitioners');
+      if (empty) {
+        empty.hidden = visible.length !== 0;
+        if (!visible.length && emptyTitle && emptyDescription) {
+          if (!providers.length) {
+            emptyTitle.textContent = 'No published practitioners or providers yet';
+            emptyDescription.textContent = 'Browse services and places, or invite a provider to introduce their work.';
+          } else {
+            emptyTitle.textContent = 'No providers match these filters';
+            emptyDescription.textContent = 'Clear the filters or try a broader search across published provider information.';
+          }
+        }
+      }
+      if (count) count.textContent = visible.length + (visible.length === 1 ? ' provider' : ' providers');
     }
 
     [search, cityFilter, topicFilter].forEach(function (control) {
