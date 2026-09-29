@@ -32,18 +32,18 @@
   function renderEmpty() {
     const lang = getLang();
     track.innerHTML = `
-      <div class="event-card glass-card home-events-status">
-        <h3>${emptyLabel}</h3>
-        <p>${new Date().toLocaleDateString(getLocale(lang), { month: 'long', year: 'numeric' })}</p>
+      <div class="state-card state-card--success home-events-status" role="status">
+        <strong>${emptyLabel}</strong>
+        <span>${new Date().toLocaleDateString(getLocale(lang), { month: 'long', year: 'numeric' })}</span>
       </div>
     `;
   }
 
   function renderUnavailable() {
     track.innerHTML = `
-      <div class="event-card glass-card home-events-status" role="status">
-        <h3>${EVENTS_UNAVAILABLE_TEXT}</h3>
-        <p>Please try again later.</p>
+      <div class="state-card state-card--unavailable home-events-status" role="status">
+        <strong>${EVENTS_UNAVAILABLE_TEXT}</strong>
+        <span>Please try again later.</span>
       </div>
     `;
   }

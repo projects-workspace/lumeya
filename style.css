@@ -1,4 +1,4 @@
-@import url("mvp.css?v=2");
+@import url("mvp.css?v=3");
 
 html {
   scroll-behavior: smooth;
@@ -642,7 +642,8 @@ section {
 }
 
 .home-events-status {
-  opacity: 0.86;
+  width: 100%;
+  opacity: 1;
 }
 
 .event-card:hover {
@@ -5529,7 +5530,7 @@ body:not(.calendar-page):not(.grayscale-mode) .hero-content {
 body:not(.calendar-page):not(.grayscale-mode) .gallery-header h1,
 body:not(.calendar-page):not(.grayscale-mode) .profile-hero .profile-name,
 body:not(.calendar-page):not(.grayscale-mode) .offer-hero h1,
-body:not(.calendar-page):not(.grayscale-mode) section:not(.hero) h2,
+body:not(.lumeya-public):not(.calendar-page):not(.grayscale-mode) section:not(.hero) h2,
 body:not(.calendar-page):not(.grayscale-mode) .om-hero__title,
 body:not(.calendar-page):not(.grayscale-mode) .om-section__title,
 body:not(.calendar-page):not(.grayscale-mode) .preview-card__title,

@@ -38,7 +38,7 @@
       city: record.city || '',
       country: record.country || '',
       topicIds: record.topicIds || [],
-      status: record.status || (record.onlineAvailability ? 'Available by contact' : ''),
+      status: record.status || 'Not published',
       url: kind === 'provider' ? (record.profileUrl || record.detailUrl) : record.detailUrl,
       contactUrl: record.contactUrl,
       coordinates,
@@ -55,6 +55,7 @@
     if (!data || !status || !mapElement || !listElement) {
       if (status) status.textContent = 'Map data is temporarily unavailable.';
       if (listElement) listElement.innerHTML = '<div class="state-card state-card--unavailable"><strong>Location data is unavailable</strong><span>Try again later, or browse service and provider pages.</span></div>';
+      document.getElementById('map-layout')?.classList.add('map-layout--list-only');
       return;
     }
 
@@ -72,6 +73,7 @@
     const mapButton = document.getElementById('show-map-view');
     const listButton = document.getElementById('show-list-view');
     const mapPanel = document.getElementById('map-panel');
+    const mapLayout = document.getElementById('map-layout');
     const mapUnavailable = document.getElementById('map-no-points');
     const mapElementUnavailable = document.getElementById('map-no-filter-points');
     const params = new URLSearchParams(window.location.search);
@@ -216,6 +218,7 @@
     function setView(view) {
       const showMap = view === 'map';
       if (showMap && (!hasVerifiedMapPoint || !map)) return;
+      if (mapLayout) mapLayout.classList.toggle('map-layout--list-only', !showMap);
       mapPanel.hidden = !showMap;
       listElement.hidden = showMap;
       mapButton.setAttribute('aria-pressed', String(showMap));
