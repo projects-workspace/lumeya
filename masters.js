@@ -22,8 +22,8 @@
 
   function safeUrl(value) {
     var url = String(value || '').trim();
-    if (!url || /^javascript:/i.test(url) || /^data:/i.test(url)) return '';
-    if (/^(https?:\/\/|\/|\.\.?\/|#)/i.test(url)) return url;
+    if (!url || url.startsWith('//') || /^javascript:/i.test(url) || /^data:/i.test(url)) return '';
+    if (/^(https?:\/\/|mailto:|tel:|\/|\.\.?\/|#)/i.test(url)) return url;
     return /^[a-z0-9][a-z0-9._/-]*(?:[?#].*)?$/i.test(url) ? url : '';
   }
 
@@ -84,7 +84,7 @@
       actions.push('<a class="button button--primary" href="' + escapeHtml(contactUrl) + '"' + newTabAttributes(contactUrl) + ' aria-label="' + escapeHtml(practitioner.contactLabel + ' about ' + practitioner.name) + '">' + escapeHtml(practitioner.contactLabel) + '</a>');
     }
 
-    return '<article class="entity-card" data-practitioner-id="' + escapeHtml(practitioner.id) + '" aria-labelledby="' + titleId + '">' +
+    return '<article class="entity-card" id="provider-' + escapeHtml(practitioner.id) + '" data-practitioner-id="' + escapeHtml(practitioner.id) + '" aria-labelledby="' + titleId + '">' +
       visual(practitioner) +
       '<div class="entity-card__topline"><span class="status-pill">' + typeLabel + '</span><span class="entity-tag">' + escapeHtml(practitioner.city || practitioner.location) + '</span></div>' +
       '<h2 id="' + titleId + '">' + escapeHtml(practitioner.name) + '</h2>' +
@@ -102,6 +102,7 @@
         linkedFact('Formats', formats, 'title', 'detailUrl') +
       '</dl>' +
       '<div class="entity-card__links">' + actions.join('') + '</div>' +
+      '<a class="entity-card__action" href="join.html?correct=providers&amp;id=' + encodeURIComponent(practitioner.id) + '#join-form">Suggest a correction</a>' +
     '</article>';
   }
 

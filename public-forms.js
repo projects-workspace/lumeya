@@ -28,6 +28,14 @@
 
   class ValidationError extends Error {}
 
+  function localIntake() {
+    return window.location.hostname === '127.0.0.1' && window.LumeyaLocalIntake?.mode === 'local-preview' ? window.LumeyaLocalIntake : null;
+  }
+
+  function routeAvailable() {
+    return navigator.onLine && (localIntake() || typeof window.supabaseClient?.rpc === 'function');
+  }
+
   function trim(value) {
     return String(value || '').trim();
   }
@@ -128,6 +136,16 @@
       throw new ValidationError('Choose online, in person, or either.');
     }
 
+    let sourcePage = window.location.pathname;
+    if (values.editorial_intent === 'correction') {
+      if (!['services', 'providers', 'places', 'eventFormats', 'scheduledEvents'].includes(values.target_collection) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(values.target_id || '')) throw new ValidationError('Open the correction link from the listing you want to update.');
+      const target = new URLSearchParams({ intent: 'correction', collection: values.target_collection, id: values.target_id });
+      sourcePage += '?' + target.toString();
+    }
+    const contact = requireText(firstValue(values, ['contact', 'contact_details', 'email']), 'Contact', 3, MAX.contact);
+    const phoneDigits = contact.replace(/\D/g, '').length;
+    const phoneValid = /^\+?[\d ()-]{7,25}$/.test(contact) && phoneDigits >= 7 && phoneDigits <= 15;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact) && !/^@[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(contact) && !/^https:\/\/t\.me\/[a-zA-Z][a-zA-Z0-9_]{4,31}\/?$/.test(contact) && !phoneValid) throw new ValidationError('Use an email address, Telegram handle starting with @, or phone number we can reply to.');
     return {
       requestType,
       subject,
@@ -135,9 +153,9 @@
       listingType: requestType === 'suggest_listing' ? listingType : null,
       location: optionalText(firstValue(values, ['location', 'city_country', 'city']), 'Location', MAX.location),
       preference: requestType === 'looking_for' ? (preference || null) : null,
-      contact: requireText(firstValue(values, ['contact', 'contact_details', 'email']), 'Contact', 3, MAX.contact),
+      contact,
       referenceUrl: validatedUrl(firstValue(values, ['reference_url', 'website_url', 'url'])),
-      sourcePage: window.location.pathname.slice(0, MAX.referenceUrl),
+      sourcePage: sourcePage.slice(0, MAX.referenceUrl),
       honeypot: firstValue(values, ['_company', 'company_website', 'website'])
     };
   }
@@ -158,7 +176,11 @@
   }
 
   function draftKey(form) {
-    return `${DRAFT_PREFIX}${requestTypeFor(form) || form.id || 'unknown'}`;
+    // Keep M1 drafts accessible on the general form; bind contextual requests
+    // and corrections to their URL so they cannot restore another listing.
+    return window.location.search
+      ? `${DRAFT_PREFIX}${form.id || requestTypeFor(form)}:${window.location.search}`
+      : `${DRAFT_PREFIX}${requestTypeFor(form) || form.id || 'unknown'}`;
   }
 
   function saveDraft(form) {
@@ -171,8 +193,9 @@
         values,
         savedAt: new Date().toISOString()
       }));
+      return true;
     } catch (error) {
-      console.warn('[PublicForms] Could not save the local draft.');
+      return false;
     }
   }
 
@@ -201,7 +224,7 @@
 
     Object.entries(draft.values).forEach(([name, value]) => {
       const field = form.elements.namedItem(name);
-      if (!field || ['_company', 'company_website', 'website'].includes(name)) return;
+      if (!field || field.type === 'hidden' || ['_company', 'company_website', 'website'].includes(name)) return;
 
       if (typeof RadioNodeList !== 'undefined' && field instanceof RadioNodeList) {
         field.value = value;
@@ -215,6 +238,25 @@
   }
 
   function prefillFromLocation(form) {
+    if (form.id === 'join-form') {
+      const params = new URLSearchParams(window.location.search);
+      const collection = params.get('correct');
+      const id = params.get('id');
+      const listing = window.LumeyaData?.getById(collection, id);
+      const context = form.querySelector('[data-editorial-context]');
+      if (collection && listing && ['services', 'providers', 'places', 'eventFormats', 'scheduledEvents'].includes(collection)) {
+        form.elements.editorial_intent.value = 'correction';
+        form.elements.target_collection.value = collection;
+        form.elements.target_id.value = id;
+        form.elements.listing_type.value = collection === 'providers' ? 'practitioner' : collection === 'places' ? 'place' : 'service';
+        form.elements.subject.value = listing.title || listing.name;
+        context.textContent = 'Correction for ' + (listing.title || listing.name) + ' (' + id + '). Explain the change and a source below. Lumeya checks your relationship to the listing before reviewing it; sending does not change the public record.';
+      } else if (collection) {
+        context.textContent = 'This correction link does not match a published listing. Open the correction link from the current listing.';
+        form.dataset.invalidCorrection = 'true';
+      }
+      return;
+    }
     if (requestTypeFor(form) !== 'looking_for') return;
     const params = new URLSearchParams(window.location.search);
     const values = {
@@ -273,6 +315,7 @@
     if (request.preference) lines.push(`Preference: ${request.preference}`);
     if (request.contact) lines.push(`Contact: ${request.contact}`);
     if (request.referenceUrl) lines.push(`Link: ${request.referenceUrl}`);
+    lines.push(`Source: ${request.sourcePage}`);
     lines.push('', 'Details:', request.details);
     return lines.join('\n');
   }
@@ -322,9 +365,9 @@
           // Preserve the last valid submission snapshot if fields were edited invalidly.
         }
         await copyText(requestSummary(currentRequest));
-        setStatus(form, 'Details copied. Open Telegram and paste them into the chat.', 'draft');
+        setStatus(form, 'Details copied; nothing has been sent. Open Telegram, paste the details, and send the message to the Lumeya operator.', 'draft');
       } catch (error) {
-        setStatus(form, 'Copy failed. Your draft is still saved in this browser.', 'error');
+        setStatus(form, 'Copy failed. Select the details manually or retry copying. Nothing has been sent.', 'error');
       }
     });
 
@@ -334,6 +377,7 @@
     telegramLink.target = '_blank';
     telegramLink.rel = 'noopener noreferrer';
     telegramLink.textContent = 'Open Telegram';
+    telegramLink.addEventListener('click', () => setStatus(form, 'Opening Telegram does not send the request. Paste the copied details and press Send in the chat with the Lumeya operator.', 'draft'));
 
     fallback.append(copyButton, telegramLink);
   }
@@ -341,21 +385,14 @@
   function setSubmitting(form, submitting) {
     form.setAttribute('aria-busy', String(submitting));
     form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
-      button.disabled = submitting || (form.dataset.requiresPublicClient === 'true' && form.dataset.publicRequestUnavailable === 'true');
-    });
-  }
-
-  function pauseUnavailableSubmit(form) {
-    if (form.dataset.disableAfterFailure !== 'true') return;
-    form.dataset.publicRequestUnavailable = 'true';
-    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
-      button.disabled = true;
+      button.disabled = submitting || form.dataset.invalidCorrection === 'true';
     });
   }
 
   async function submitRequest(form) {
-    if (form.dataset.publicRequestUnavailable === 'true') {
-      setStatus(form, 'Online submission is disabled because the public request service is not configured on this page. Check back after it is activated.', 'error');
+    if (form.getAttribute('aria-busy') === 'true') return;
+    if (form.dataset.invalidCorrection === 'true') {
+      setStatus(form, 'Open the correction link from a current listing before sending.', 'error');
       return;
     }
     if (!form.reportValidity()) return;
@@ -368,12 +405,12 @@
       return;
     }
 
-    saveDraft(form);
+    const draftSaved = saveDraft(form);
+    const draftMessage = draftSaved ? 'A draft is saved in this browser for seven days.' : 'Browser storage is unavailable; keep or copy these details before leaving.';
     hideFallback(form);
 
-    if (!navigator.onLine || !window.supabaseClient) {
-      pauseUnavailableSubmit(form);
-      setStatus(form, 'We could not send this request right now. Your draft is saved.', 'error');
+    if (!routeAvailable()) {
+      setStatus(form, (navigator.onLine ? 'Online requests are not configured here. ' : 'You are offline. ') + draftMessage + ' Nothing has been sent; choose a manual option below.', 'error');
       showFallback(form, request);
       return;
     }
@@ -381,19 +418,23 @@
     setSubmitting(form, true);
     setStatus(form, 'Sending…', 'sending');
     try {
-      const { error } = await window.supabaseClient.rpc(RPC_NAME, rpcPayload(request));
+      let timer;
+      const result = await Promise.race([
+        localIntake() ? localIntake().submit(rpcPayload(request)) : window.supabaseClient.rpc(RPC_NAME, rpcPayload(request)),
+        new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error('receipt_timeout')), 15000); })
+      ]).finally(() => clearTimeout(timer));
+      const { data, error } = result;
       if (error) throw error;
+      const receiptId = typeof data === 'string' ? data : data?.id;
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receiptId || '')) throw new Error('receipt_not_confirmed');
 
       clearDraft(form);
-      form.reset();
       hideFallback(form);
-      setStatus(form, 'Thank you. Your request has been received and queued for the Lumeya contact.', 'success');
+      setStatus(form, localIntake()
+        ? 'Saved to the operator’s private local queue. Receipt: ' + receiptId + '. This is a local preview; no hosted receipt or Telegram delivery is confirmed. The operator must review before publication.'
+        : 'Saved to Lumeya’s private request queue. Receipt: ' + receiptId + '. A Lumeya operator reviews it and follows up using your contact. Notification delivery is not confirmed; this does not book a service or publish a listing.', 'success');
     } catch (error) {
-      console.warn('[PublicForms] Request submission failed:', error?.message || error);
-      pauseUnavailableSubmit(form);
-      setStatus(form, form.dataset.disableAfterFailure === 'true'
-        ? 'Online submission has been paused after a failed request. Your draft is saved; you can choose a manual option below.'
-        : 'We could not send this request right now. Your draft is saved.', 'error');
+      setStatus(form, 'A receipt could not be confirmed. ' + draftMessage + ' Retry the same details or choose a manual option; the operator checks duplicates before publication.', 'error');
       showFallback(form, request);
     } finally {
       setSubmitting(form, false);
@@ -406,17 +447,17 @@
     let updateRouteAvailability = null;
     if (form.dataset.requiresPublicClient === 'true') {
       updateRouteAvailability = function () {
-        const available = navigator.onLine && window.supabaseClient && typeof window.supabaseClient.rpc === 'function';
+        const available = routeAvailable();
         form.dataset.publicRequestUnavailable = String(!available);
         form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((button) => {
-          button.disabled = !available;
+          button.disabled = form.dataset.invalidCorrection === 'true' || form.getAttribute('aria-busy') === 'true';
         });
         if (!available) {
-          setStatus(form, 'Online submission is disabled because the public request service is not configured on this page. Check back after it is activated.', 'error');
+          setStatus(form, navigator.onLine ? 'Online requests are not configured here. You can prepare details and choose a manual contact option.' : 'You are offline. You can prepare a draft and send it when connected.', 'error');
         } else if (form.dataset.publicRequestUnavailable === 'false' && form.dataset.routeWasUnavailable === 'true') {
           setStatus(form, 'Online submission is available.', 'success');
         } else if (form.querySelector('[data-form-status]')?.textContent === 'Checking online request availability…') {
-          setStatus(form, 'Online submission is configured here. Requests still depend on the public service being available.', 'success');
+          setStatus(form, localIntake() ? 'Local preview: requests are saved to a private operator queue on this computer. Hosted receipt and notification delivery are untested.' : 'Online submission is configured here. A saved receipt will confirm persistence; notification delivery is separate.', 'success');
         }
         form.dataset.routeWasUnavailable = String(!available);
       };

@@ -7,7 +7,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "verify": "npm run catalog:check && node verify/run.js",
+    "verify": "npm run catalog:check && npm run verify:editorial && node verify/run.js",
     "catalog:validate": "node scripts/catalog.js validate",
     "catalog:publish": "node scripts/catalog.js publish",
     "catalog:check": "node scripts/catalog.js check",
@@ -21,7 +21,10 @@
     "verify:security": "node verify/run.js --security",
     "verify:secrets": "node verify/run.js --secrets",
     "verify:smoke": "node verify/run.js --smoke",
-    "verify:static-only": "npm run catalog:check && node verify/run.js --pages --links --assets --js --static --mvp --journey --security --secrets"
+    "verify:static-only": "npm run catalog:check && node verify/run.js --pages --links --assets --js --static --mvp --journey --security --secrets",
+    "editorial": "node scripts/editorial.js",
+    "dev:editorial": "node scripts/editorial-preview.js",
+    "verify:editorial": "node --test verify/editorial.test.js verify/events.test.js"
   },
   "devDependencies": {
     "supabase": "2.116.0"

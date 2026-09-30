@@ -35,7 +35,11 @@
 
     <section class="public-section" aria-labelledby="join-form-heading">
       <div class="section-heading"><div><p class="eyebrow">No account or upload</p><h2 id="join-form-heading">Introduce your work for review</h2><p>The existing public intake accepts Practitioner, Service or Place suggestions. It does not have a separate organisation registration type.</p></div></div>
-      <form class="public-form" id="join-form" data-public-request="suggest_listing" data-requires-public-client="true" data-disable-after-failure="true" novalidate>
+      <form class="public-form" id="join-form" data-public-request="suggest_listing" data-requires-public-client="true" novalidate>
+        <p data-editorial-context>Your request goes to Lumeya’s private editorial queue. An operator checks sources and your relationship to the work, asks for clarification if needed, then explicitly approves the public fields. Only approved information is published.</p>
+        <input name="editorial_intent" type="hidden" value="introduction">
+        <input name="target_collection" type="hidden" value="">
+        <input name="target_id" type="hidden" value="">
         <label for="join-listing-type">What are you introducing?</label>
         <select id="join-listing-type" name="listing_type" required>
           <option value="practitioner">A practitioner</option>
@@ -58,7 +62,7 @@
 
         <label for="join-contact">How can Lumeya follow up?</label>
         <input id="join-contact" name="contact" type="text" minlength="3" maxlength="240" autocomplete="email" required>
-        <small>Use a contact detail you are comfortable sharing for this request.</small>
+        <small>Use an email address, Telegram handle or phone number. This follow-up contact remains private; any public listing contact is reviewed separately. Claiming to be a provider does not establish identity.</small>
 
         <label class="visually-hidden" for="join-company">Leave this field empty</label>
         <input id="join-company" name="_company" type="text" tabindex="-1" autocomplete="off" class="honeypot-field" aria-hidden="true">
@@ -69,7 +73,7 @@
           <span>If online submission fails, you can choose whether to continue in Telegram.</span>
         </div>
       </form>
-      <p class="legacy-note">The request uses Lumeya’s existing public suggestion route. Online activation depends on the page’s publishable client configuration and the <code>submit_public_discovery_request</code> function; the form stays disabled if the client is not configured.</p>
+      <p class="information-note">To update existing information, use “Suggest a correction” on its listing. Sending a correction never edits the public record automatically. If a receipt cannot be confirmed, retry the same details or copy them into Telegram and send them yourself. Opening Telegram alone does not send anything.</p>
       <p><a href="suggest.html#suggest-listing">Use the general listing suggestion form</a> · <a href="about.html">Read how curation works</a></p>
     </section>
   </main>
@@ -79,6 +83,7 @@
   <script src="public-config.js?v=1"></script>
   <script src="auth.js?v=7"></script>
   <script src="menu.js?v=12"></script>
-  <script src="public-forms.js?v=2"></script>
+  <script src="discovery-data.js?v=2"></script>
+  <script src="public-forms.js?v=3"></script>
 </body>
 </html>

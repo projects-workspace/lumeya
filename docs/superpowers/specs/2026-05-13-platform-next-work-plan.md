@@ -1,4 +1,22 @@
-# Santiago Platform: Current State And Next Work Plan
+# Lumeya milestone plan — M2 checkpoint (2026-09-30)
+
+The sole implementation snapshot is [PROJECT_STATE.md](../../../PROJECT_STATE.md). This plan records milestone decisions; the original May plan below is historical context and does not authorize its private-platform/account features.
+
+| Milestone | Decision | Scope/result |
+| --- | --- | --- |
+| M1 | Accepted by the user | Public discovery foundation and browser QA, baseline `3886eb0` + `4b908fd`; continue HEAD without resetting. |
+| M2 | Locally accepted | Existing real service/contact paths and a demonstrated private operator receipt → clarification/review → explicit approval → generated publication → reviewed correction flow. Persistence, retries, rejection/anonymous boundaries, errors and desktop/mobile/keyboard checks passed. Remote receipt/delivery and first real provider editorial approval remain separately unverified. |
+| M3 | Pending; not started | Hosted activation/final acceptance requires separately authorized live writes/tests/deployment and checked real submissions. |
+
+M2 uses the existing static catalogue and request contract, with the operator CLI and loopback-only preview described in [catalog publishing](../../catalog-publishing.md). No CMS, dashboard, My Space or Provider Space was introduced. Synthetic publication tests used temporary public copies; legitimate published IDs/data were preserved. One existing Lila offer/contact was checked against its supplied linked profile; real ecological/craft service content remains missing.
+
+Before M3 acceptance: verify hosted RPC receipt/privacy/retry idempotency, private operator receipt import with exact target/server access, notification worker/admin delivery and retention, actual provider/source checks, and the deployed journey. A single current public Events read returned HTTP 200/empty; ongoing health and earlier intermittent failures remain uncertain. Local mechanics do not prove these integrations. No live submission, migration, deployment or outreach ran in M2. A local commit is the delivery boundary while branch auto-deployment safety remains unverified (Vercel connector schema mismatch).
+
+Stop after M2. Do not resume the historical account, bookings, reminders or cabinet tasks below from this plan alone. Usage/model evidence and remaining activation blockers are recorded in PROJECT_STATE.md; project allowance/spend remain unknown and account deltas do not establish the ≤50% project target.
+
+---
+
+# Historical Santiago Platform: Current State And Next Work Plan (2026-05-13)
 
 ## Current State
 

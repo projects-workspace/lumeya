@@ -239,10 +239,27 @@
       } else if (status === 'ready') {
         state.classList.add('state-card--success');
         state.innerHTML = '<strong>No upcoming scheduled events are currently published</strong><span>Event formats below are undated ideas or request-based formats, not confirmed dates.</span>';
+      } else if (status === 'unconfigured') {
+        state.classList.add('state-card--unavailable');
+        state.innerHTML = '<strong>Event schedule is not configured</strong><span>No public schedule is connected here. Undated formats below remain available.</span>';
       } else {
         state.classList.add('state-card--unavailable');
         state.innerHTML = '<strong>Events temporarily unavailable</strong><span>' + escapeHtml(message || 'The live event source is not connected. Event formats below remain available for discovery.') + '</span>';
       }
+      if (status === 'unavailable' || status === 'unconfigured') {
+        var retry = document.createElement('button'); retry.type = 'button'; retry.className = 'button'; retry.textContent = 'Try again';
+        retry.addEventListener('click', loadSchedule); state.appendChild(retry);
+      }
+    }
+
+    function loadSchedule() {
+      setScheduleState('loading');
+      if (!root.LumeyaEventsProvider || typeof root.LumeyaEventsProvider.load !== 'function') return setScheduleState('unconfigured');
+      Promise.resolve(root.LumeyaEventsProvider.load()).then(function (events) {
+        setScheduleState('ready', events);
+      }).catch(function (error) {
+        setScheduleState(error?.message === 'public_event_source_unconfigured' ? 'unconfigured' : 'unavailable', [], 'The public schedule could not be read. This does not mean there are no events. Undated formats below remain available.');
+      });
     }
 
     function acceptSchedule(detail) {
@@ -276,14 +293,9 @@
     if (data.scheduledEvents.length) {
       setScheduleState('ready', data.scheduledEvents);
     } else if (root.LumeyaEventsProvider && typeof root.LumeyaEventsProvider.load === 'function') {
-      setScheduleState('loading');
-      Promise.resolve(root.LumeyaEventsProvider.load()).then(function (events) {
-        setScheduleState('ready', events);
-      }).catch(function () {
-        setScheduleState('unavailable', [], 'The live event source could not be reached. Event formats below remain available for discovery.');
-      });
+      loadSchedule();
     } else {
-      setScheduleState('unavailable', [], 'The live event source is not connected. No scheduled event is being claimed. Event formats below remain available for discovery.');
+      setScheduleState('unconfigured');
     }
   }
 

@@ -236,7 +236,11 @@
       "contactLabel": "Contact Violetta on Telegram",
       "providerIds": [
         "violetta-blago"
-      ]
+      ],
+      "sourceUrls": [
+        "profile-violetta.html"
+      ],
+      "sourceNote": "Supported by the existing provider profile and its published @violettablago contact. Current availability, identity and qualifications have not been independently checked."
     },
     {
       "id": "universal-therapy-constellations",

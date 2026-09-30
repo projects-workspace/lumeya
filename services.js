@@ -14,8 +14,8 @@
 
   function safeUrl(value) {
     var url = String(value || '').trim();
-    if (!url || /^javascript:/i.test(url) || /^data:/i.test(url)) return '';
-    if (/^(https?:\/\/|\/|\.\.?\/|#)/i.test(url)) return url;
+    if (!url || url.startsWith('//') || /^javascript:/i.test(url) || /^data:/i.test(url)) return '';
+    if (/^(https?:\/\/|mailto:|tel:|\/|\.\.?\/|#)/i.test(url)) return url;
     return /^[a-z0-9][a-z0-9._/-]*(?:[?#].*)?$/i.test(url) ? url : '';
   }
 
@@ -77,7 +77,9 @@
       }))
       : fact('Provider', service.provider);
 
-    return '<article class="entity-card" data-service-id="' + escapeHtml(service.id) + '" aria-labelledby="' + titleId + '">' +
+    var recipient = /^https:\/\/t\.me\/(?!santioago_bot(?:[/?]|$))/i.test(contactUrl) ? 'This opens the published Telegram contact for ' + (service.provider || 'the provider') + '. Write and send your message there; opening the link does not send it.' : /^(?:suggest\.html|https:\/\/t\.me\/santioago_bot)/i.test(contactUrl) ? 'Contact goes to a Lumeya operator about this provider. The operator follows up; a request does not confirm a booking.' : contactUrl ? 'Use the provider’s published contact to ask about availability. Opening the contact link does not send a request or confirm a booking.' : 'No contact is published. Suggest a correction with a source for editorial review.';
+    var sources = (service.sourceUrls || []).map(function (url) { return '<a href="' + escapeHtml(safeUrl(url)) + '"' + newTabAttributes(url) + '>Information source</a>'; });
+    return '<article class="entity-card" id="service-' + escapeHtml(service.id) + '" data-service-id="' + escapeHtml(service.id) + '" aria-labelledby="' + titleId + '">' +
       '<div class="entity-card__visual" aria-hidden="true">' + escapeHtml(initials(service.title)) + '</div>' +
       '<div class="entity-card__topline"><span class="status-pill">' + escapeHtml(service.status) + '</span><span class="entity-tag">' + escapeHtml(service.format) + '</span></div>' +
       '<h2 id="' + titleId + '">' + escapeHtml(service.title) + '</h2>' +
@@ -92,7 +94,10 @@
         relationshipRow('Place', places.map(function (record) { return recordLink(record, 'name', 'detailUrl'); })) +
         relationshipRow('Event format', formats.map(function (record) { return recordLink(record, 'title', 'detailUrl'); })) +
       '</dl>' +
+      '<p class="privacy-note">' + escapeHtml(recipient) + '</p>' +
+      (sources.length ? '<p class="privacy-note">' + sources.join(' · ') + (service.sourceNote ? '<br>' + escapeHtml(service.sourceNote) : '') + '</p>' : '') +
       '<div class="entity-card__links">' + links.join('') + '</div>' +
+      '<a class="entity-card__action" href="join.html?correct=services&amp;id=' + encodeURIComponent(service.id) + '#join-form">Suggest a correction</a>' +
     '</article>';
   }
 

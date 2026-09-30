@@ -109,3 +109,7 @@ npm run test:public-mvp
 This requires the dedicated project's URL, publishable key and service-role key
 in the local environment. It must never be run against another ecosystem
 project.
+
+## M2 focused checks
+
+`npm run verify:editorial` uses Node's existing test runner, temporary public fixture roots and private mode-700 directories. It tests real filesystem/HTTP persistence and subprocess restart, exact retry deduplication, clarification/rejection/approval gates, reviewed corrections, stale-edit refusal, interrupted publication regeneration, private-field rejection, CLI output privacy, anonymous HTTP denials and event-reader error/empty/unconfigured paths. Fixtures never write to live services or the repository's public catalogue. Deterministic event-client fixtures prove code behaviour only; they do not prove Supabase or worker integration. The full `npm run verify` includes these focused checks before the existing release gate. Loopback HTTP tests require an environment that allows local port binding.

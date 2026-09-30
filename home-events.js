@@ -3,7 +3,6 @@
 
   const track = document.getElementById('home-events-track');
 
-  const sb = window.supabaseClient;
   const DEFAULT_LANG = 'en';
   const MAX_EVENTS = 5;
   const LOOKAHEAD_MONTHS = 6;
@@ -39,38 +38,20 @@
     `;
   }
 
-  function renderUnavailable() {
+  function renderUnavailable(error) {
+    const unconfigured = error?.message === 'public_event_source_unconfigured';
     track.innerHTML = `
       <div class="state-card state-card--unavailable home-events-status" role="status">
-        <strong>${EVENTS_UNAVAILABLE_TEXT}</strong>
-        <span>Please try again later.</span>
+        <strong>${unconfigured ? 'Event schedule is not configured' : EVENTS_UNAVAILABLE_TEXT}</strong>
+        <span>${unconfigured ? 'No connected public schedule is available here.' : 'The schedule could not be read. This does not mean there are no events.'}</span>
+        <button class="button" type="button" data-retry-home-events>Try again</button>
       </div>
     `;
-  }
-
-  function expandRecurrence(event, startDate, endDate) {
-    if (!event.recurrence_rule || !window.RRule) return [event];
-
-    try {
-      const rule = window.RRule.fromString(event.recurrence_rule);
-      const duration = event.duration_minutes || Math.max(60, Math.round((new Date(event.end_time) - new Date(event.start_time)) / 60000));
-      return rule.between(startDate, endDate, true).map(date => ({
-        ...event,
-        id: `${event.id}_${date.getTime()}`,
-        start_time: date.toISOString(),
-        end_time: new Date(date.getTime() + duration * 60000).toISOString()
-      }));
-    } catch (err) {
-      console.warn('[HomeEvents] Recurrence expansion failed:', err);
-      return [event];
-    }
+    track.querySelector('[data-retry-home-events]').addEventListener('click', loadHomeEvents);
   }
 
   function eventVisibleForRole(event) {
-    const role = window.MA3Auth?.user?.role || 'guest';
-    if (role === 'admin' || role === 'instructor') return true;
-    if (role === 'resident') return event.type === 'public' || event.type === 'club';
-    return event.type === 'public';
+    return event.type === 'public' && event.status === 'confirmed';
   }
 
   function renderEvents(events) {
@@ -100,36 +81,41 @@
   }
 
   async function fetchUpcomingEvents() {
+    const sb = window.supabaseClient;
     if (!sb) {
-      throw new Error('public_event_source_unavailable');
+      throw new Error('public_event_source_unconfigured');
     }
 
     const now = new Date();
     const lookahead = new Date(now);
     lookahead.setMonth(lookahead.getMonth() + LOOKAHEAD_MONTHS);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     try {
       const { data, error } = await sb
         .from('events')
         .select('*')
         .eq('type', 'public')
         .eq('status', 'confirmed')
+        .gte('start_time', now.toISOString())
         .lte('start_time', lookahead.toISOString())
-        .order('start_time', { ascending: true });
+        .order('start_time', { ascending: true })
+        .limit(200)
+        .abortSignal(controller.signal);
 
       if (error) throw error;
 
-      const upcoming = (data || [])
+      if (!Array.isArray(data)) throw new Error('public_event_response_invalid');
+      const upcoming = data
         .filter(eventVisibleForRole)
-        .flatMap(event => expandRecurrence(event, now, lookahead))
+        // Show confirmed stored dates. Do not imply further dates from an old
+        // recurrence rule when the public schedule has no stored future event.
         .filter(event => new Date(event.start_time) >= now)
         .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
       return upcoming;
-    } catch (err) {
-      console.warn('[HomeEvents] Could not load events:', err);
-      throw err;
-    }
+    } finally { clearTimeout(timeout); }
   }
 
   function publicEventRecord(event) {
@@ -155,7 +141,7 @@
       const events = await fetchUpcomingEvents();
       if (track) renderEvents(events);
     } catch (err) {
-      if (track) renderUnavailable();
+      if (track) renderUnavailable(err);
     }
   }
 

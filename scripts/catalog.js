@@ -18,6 +18,20 @@ const COLLECTIONS = {
   scheduledEvents: ['id', 'title', 'startAt', 'status'],
 };
 
+// Only these reviewed public fields may leave the editorial source.
+const PUBLIC_FIELDS = {
+  categories: 'id label description topicIds',
+  topics: 'id label description categoryId',
+  services: 'id slug title description status format delivery duration location price topicIds providerIds practitionerIds placeIds eventFormatIds provider detailUrl contactUrl contactLabel sourceUrls sourceNote',
+  providers: 'id slug type name shortDescription approach fields topicIds location city country coordinates coordinatesVerified coordinateSourceUrl locationPrecision languages onlineAvailability experience serviceIds placeIds eventFormatIds providerIds externalLinks image imageAlt profileUrl detailUrl contactUrl contactLabel sourceUrls sourceNote',
+  places: 'id slug name description status type topicIds location address city country coordinates coordinatesVerified coordinateSourceUrl locationPrecision providerIds practitionerIds serviceIds eventFormatIds detailUrl mapUrl contactUrl contactLabel sourceUrls sourceNote',
+  eventFormats: 'id slug title description kind status format topicIds location organizer providerIds practitionerIds placeIds serviceIds detailUrl contactUrl contactLabel sourceUrls sourceNote',
+  scheduledEvents: 'id title description startAt endAt status location organizer providerIds practitionerIds placeIds serviceIds url contactUrl contactLabel sourceUrls sourceNote',
+};
+for (const name of Object.keys(PUBLIC_FIELDS)) {
+  PUBLIC_FIELDS[name] = new Set(('publicationStatus ' + PUBLIC_FIELDS[name]).split(' '));
+}
+
 const RELATIONSHIPS = {
   categories: { topicIds: 'topics' },
   topics: { categoryId: 'categories' },
@@ -58,6 +72,9 @@ function validateLink(value, label, errors) {
       if (!['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol)) {
         errors.push(`${label} uses an unsupported URL scheme.`);
       }
+      if (parsed.username || parsed.password) errors.push(`${label} must not contain URL credentials.`);
+      if (parsed.protocol === 'mailto:' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.pathname)) errors.push(`${label} must contain a replyable email address.`);
+      if (parsed.protocol === 'tel:' && (parsed.pathname.replace(/\D/g, '').length < 7 || parsed.pathname.replace(/\D/g, '').length > 15)) errors.push(`${label} must contain a valid phone number.`);
     } catch {
       errors.push(`${label} is not a valid URL.`);
     }
@@ -67,8 +84,14 @@ function validateLink(value, label, errors) {
     errors.push(`${label} must use http, https, mailto, tel, or a local site path.`);
     return;
   }
-  const pathname = decodeURIComponent(link.split(/[?#]/, 1)[0]);
+  let pathname;
+  try { pathname = decodeURIComponent(link.split(/[?#]/, 1)[0]); }
+  catch { errors.push(`${label} has invalid URL encoding.`); return; }
   if (!pathname || pathname === '/') return;
+  if (pathname.split('/').some(part => part.startsWith('.')) || /^(?:bot|scripts|verify|docs|content-source)(?:\/|$)/.test(pathname.replace(/^\//, '')) || !/\.(?:html|png|jpe?g|webp|gif|svg|ico|mp4|mov)$/i.test(pathname)) {
+    errors.push(`${label} must point to a public page or asset.`);
+    return;
+  }
   const target = path.resolve(ROOT, pathname.replace(/^\//, ''));
   if (target !== ROOT && !target.startsWith(`${ROOT}${path.sep}`)) {
     errors.push(`${label} points outside the project.`);
@@ -94,6 +117,7 @@ function validateCatalog(catalog) {
   if (!isPlainObject(catalog) || catalog.schemaVersion !== 1) {
     return ['catalog.json must be an object with schemaVersion 1.'];
   }
+  if (Object.keys(catalog).some(key => !['schemaVersion', 'version', ...Object.keys(COLLECTIONS)].includes(key))) errors.push('catalog.json contains a field outside the public schema.');
 
   const idOwners = new Map();
   const byCollection = {};
@@ -115,11 +139,25 @@ function validateCatalog(catalog) {
       if (record.publicationStatus !== 'published') {
         errors.push(`${label} must have publicationStatus "published"; drafts and fixtures belong outside the published catalog.`);
       }
+      for (const [field, value] of Object.entries(record)) {
+        if (!PUBLIC_FIELDS[collection].has(field)) errors.push(`${label}.${field} is not an approved public field.`);
+        if (value && typeof value === 'object' && !Array.isArray(value)) errors.push(`${label}.${field} cannot contain nested private data.`);
+        if (Array.isArray(value) && field !== 'externalLinks' && value.some(item => item && typeof item === 'object')) errors.push(`${label}.${field} cannot contain nested private data.`);
+      }
+      if (record.externalLinks && (!Array.isArray(record.externalLinks) || record.externalLinks.some(item => !isPlainObject(item) || Object.keys(item).some(key => !['label', 'url'].includes(key)) || typeof item.label !== 'string' || typeof item.url !== 'string'))) {
+        errors.push(`${label}.externalLinks must contain public label/url pairs only.`);
+      }
+      if (record.sourceUrls !== undefined) {
+        if (!Array.isArray(record.sourceUrls) || record.sourceUrls.some(url => typeof url !== 'string' || !url.trim())) errors.push(`${label}.sourceUrls must be a list of public source links.`);
+        else record.sourceUrls.forEach((url, i) => validateLink(url, `${label}.sourceUrls[${i}]`, errors));
+      }
       for (const field of requiredFields) {
         if (record[field] === undefined || record[field] === null || record[field] === '') {
           errors.push(`${label}.${field} is required.`);
         }
+        if (field !== 'topicIds' && (typeof record[field] !== 'string' || !record[field].trim())) errors.push(`${label}.${field} must be public text.`);
       }
+      if (typeof record.id !== 'string') errors.push(`${label}.id must be a stable lowercase slug.`);
       if (typeof record.id === 'string') {
         if (!ID_PATTERN.test(record.id)) errors.push(`${label}.id must be a stable lowercase slug.`);
         if (idOwners.has(record.id)) errors.push(`${label}.id duplicates ${idOwners.get(record.id)}.`);
@@ -270,4 +308,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { validateCatalog, buildBrowserData, renderBrowserFile };
+module.exports = { validateCatalog, buildBrowserData, renderBrowserFile, PUBLIC_FIELDS };
