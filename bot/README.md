@@ -56,12 +56,14 @@ stores the request when possible, and directly notifies `ADMIN_CHAT_ID` even if
 database persistence fails.
 
 Migration 0016 was historically applied to the dedicated Lumeya project. The
-current `0017_idempotent_public_discovery_requests.sql` file is a local candidate
-and has not been applied. The disposable live contract writes test rows, so run
-it only after an operator confirms an existing isolated non-production branch
-in Supabase by checking its exact ref, branch type, parent and Production Branch.
-The script rejects the known Production ref and requires the URL host to match
-the confirmed branch ref.
+actual `0017_idempotent_public_discovery_requests.sql` file has been executed
+only in a disposable local Supabase PostgreSQL database with a reconstructed
+0016-compatible table and synthetic data. No hosted database was changed. The
+disposable live contract writes test rows, so run it only against an already
+existing isolated non-production target whose exact ref and relationship to
+Production have been verified. A cloud branch is optional and must not be
+created for this test. The script rejects the known Production ref and requires
+the URL host to match the confirmed branch ref.
 
 Add these test-only values to the environment when the branch-specific
 credentials are available; do not reuse Production credentials or edit the
@@ -86,9 +88,9 @@ checks that exact retries preserve one receipt, changed content does not
 overwrite it, distinct keys create distinct rows, direct anonymous reads remain
 denied, and invalid content is rejected. Assertions and cleanup logs redact
 request content, keys and receipt IDs. Do not run it against Production or any
-unconfirmed project. If the existing branch cannot be read or its branch-scoped
-credentials are unavailable, stop before running it; do not substitute a local
-preview result for the live check.
+unconfirmed project. If no safe existing hosted target or its scoped credentials
+are available, skip this live test; local SQL validation does not prove hosted
+PostgREST behavior.
 
 ## Deployment
 

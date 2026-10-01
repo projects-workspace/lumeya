@@ -140,11 +140,11 @@ For tester comments, use the existing `suggest.html#looking-for` form. Set Topic
 
 - The current hosted site is older than local M2. `join.html` returns 404; the hosted Events page says the source is not connected and emitted no Events REST request in the browser. Mapped Chrome Profile 17 read-only dashboard access confirmed Production Branch `main`, a connected Git repository, Ready production commit `eb0fda8`, and the primary domain. Vercel API listing returned 403 and no Vercel CLI is installed; the mapped Chrome route exposed the project settings, connected repository, production branch and current deployment.
 - The local M2 editorial queue is not a hosted operator handoff. Supabase management connector reads are denied; no valid request RPC was invoked. OpenAPI introspection returned 401; a no-argument GET returned PGRST202, which is not an RPC execution test. A public GET of `public_discovery_requests` returned 401/PGRST42501, confirming anon read denial on that endpoint. A public Events read returned 200/empty.
-- Current RPC SQL inserts a new row for every valid call. Its IP/user-agent fingerprint provides rate limiting, not content idempotency. A same-payload retry can create a second request and notification. Supabase management calls, including branch listing, returned permission errors; no existing non-production test branch could be confirmed. The M3 request form has not been exercised with a valid payload.
+- The last observed hosted request RPC is pre-0017 and inserts a new row for every valid call. Its IP/user-agent fingerprint provides rate limiting, not content idempotency, so a hosted same-payload retry can create a second request and notification. This is historical hosted evidence; no hosted RPC was called in the current pass. The M3 form has not been exercised against a valid hosted RPC. Supabase management calls, including branch listing, returned permission errors; no existing non-production test target was confirmed.
 - The bot requires a running process, service-role environment, `BOT_TOKEN` and `ADMIN_CHAT_ID`. Repository source documents a polling worker and 90-day expiry function, but no current worker uptime, admin delivery or retention schedule is verified. No service-role environment value was read.
 - The existing Lila record is suitable as the sole sourced presentation example; its profile/contact match project-supplied information and the public Telegram page exists, but identity, qualification, availability and outcomes are not independently verified. Other ecological/craft service content is missing. The map has no verified pins and the live scheduled-event list was empty at the time of the check. No accounts, booking, payment, certification or personal workspace are included in this MVP.
 
-No hosted form submission, Telegram message, migration, deployment or release-triggering push ran during these checks. [Vercel documents automatic deployments for connected Git pushes](https://vercel.com/docs/git); the mapped project settings confirm `main` as Production Branch. Pushing the current M2 candidate there would publish it. The remote delivery branch still has M1-era commit `eb0fda8`, while local M2 is at `b86d2fd`. M3 is not accepted until the hosted retry defect is resolved and safely tested, operator delivery/retention are verified, the user explicitly authorizes the Production push, and the M2 candidate's production URL is verified on desktop and mobile.
+No hosted form submission, Telegram message, migration, deployment or release-triggering push ran during the current pass. [Vercel documents automatic deployments for connected Git pushes](https://vercel.com/docs/git); the mapped project settings confirm `main` as Production Branch. Pushing the current M2 candidate there would publish it. The remote delivery branch still has M1-era commit `eb0fda8`, while local M2 is at `b86d2fd`. M3 remains pending until the hosted schema is checked, 0017 is applied through an authorized path, hosted retries are safely verified, operator delivery/retention are verified, Production release is explicitly authorized, and the resulting production URL is checked on desktop and mobile.
 
 ## M3 local idempotency candidate — 2026-10-01
 
@@ -161,25 +161,49 @@ when browser storage cannot preserve a retry key across reloads; when a receipt
 is uncertain it retries with that key and suppresses the manual Telegram-send
 option until an operator checks for the first receipt.
 
-The existing Supabase management branch-list call was denied again. A
-read-only check of the mapped browser dashboard could not continue because the
-Mac was locked and automatic unlock failed. No existing non-production branch
-ref or branch-specific credentials could be verified. Migration 0017 was not
-applied; the new live contract was not run. Production and stored rows were
-untouched. The local loopback test uses isolated
-filesystem fixtures and proves one receipt survives a server restart, an exact
-retry returns the same ID without changing queue bytes, a conflict leaves the
-original intact, and a distinct key creates a second receipt. Generic errors
-contain no request text, key or receipt ID. This is local preview evidence only;
-it does not prove PostgreSQL execution, deployed RPC behavior or hosted receipt
-persistence.
+The actual 0017 SQL was executed in two isolated databases inside the already
+running local Supabase PostgreSQL 17.6 container; both were created for this
+pass and dropped afterward. Each used a minimal pre-0017 schema reconstructed
+from the request-table definition in migration 0016, with the Supabase `anon`,
+`authenticated` and `service_role` roles already present. The primary test
+database also had one synthetic legacy row inserted before 0017. This was not a
+replay of the old migration chain and does not establish that the hosted schema
+matches the reconstructed baseline.
 
-To run the live check, provide access to an existing Supabase branch so its ref,
-branch type, parent and Production Branch can be verified, then provide
-branch-scoped test keys after migration 0017 is applied there. Set the
-`LUMEYA_TEST_SUPABASE_*` variables documented in `bot/README.md`. No branch may
-be created for this test. The worker source claims pending requests in batches,
-sends them to `ADMIN_CHAT_ID` and records notified/failed status, with the
-migration limiting attempts; no worker runtime, Telegram receipt or 90-day
-cleanup schedule was verified. M3 remains pending, and this candidate is neither
-hosted nor a Production release.
+SQL assertions passed for the migration and partial unique index; sequential
+same-key calls in separate committed anonymous sessions returning one receipt
+and one row; two overlapping anonymous RPC sessions returning that same receipt;
+changed content returning only `idempotency_key_conflict` with no error detail
+or hint and leaving the original row intact; distinct keys creating separate
+rows; and the separate fingerprint limit admitting five distinct keys and
+rejecting the sixth. The pre-existing synthetic legacy row retained its
+values and a null retry key. Two calls through the legacy ten-argument RPC
+remained callable and produced separate rows. `anon` and `authenticated` could
+not read or directly update the private table; catalog and ACL checks confirmed
+the two public RPC grants only for `anon`/`authenticated`, no `PUBLIC` execute
+grant, an unexposed internal function, the expected definer/invoker modes, and
+empty function search paths. The retry-key column had no browser-role read
+grant. Temporary concurrency instrumentation and both disposable databases
+were removed after the checks.
+
+Source review of `public-forms.js` confirmed that forms call only the keyed RPC.
+If it is unavailable, the error path reports an unconfirmed receipt, keeps the
+same retry key, and withholds manual Telegram sending; it does not call the
+legacy duplicate-prone RPC or report a saved receipt. This was a code-path
+review, not a hosted or browser execution with 0017 absent.
+
+No hosted database was read or changed in this pass. The earlier hosted access
+limitations remain as recorded in the release-blocker notes above; an isolated
+cloud branch is optional and must not be created for this work. A hosted write
+test requires an already existing, positively verified non-production target
+and scoped test credentials. Before any frontend activation, verify that the
+hosted table matches the current 0016-compatible column, constraint, RLS and
+grant contract and that the legacy ten-argument RPC is present. Apply only
+migration 0017 through an authorized path; if the schema differs, stop rather
+than replaying older migrations. Verify the hosted RPC before publishing the
+client. If the RPC is missing or fails, keep the existing unavailable/contact behavior and do not
+fall back to the legacy RPC. For rollback, disable or revert the client while
+leaving the additive migration and existing data intact; do not remove the
+retry key or index to work around a client problem. Hosted receipt behavior,
+worker delivery/failure handling, the 90-day cleanup schedule and deployment
+remain unverified. M3 remains pending and no Production release ran.
