@@ -166,6 +166,7 @@ body.menu-open { overflow: hidden; }
   align-items: center !important;
   padding: 0 1rem !important;
   border-radius: 0.9rem !important;
+  background: transparent !important;
   color: var(--lumeya-muted) !important;
   font-size: 1rem !important;
 }
