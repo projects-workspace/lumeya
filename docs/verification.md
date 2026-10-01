@@ -144,7 +144,7 @@ For tester comments, use the existing `suggest.html#looking-for` form. Set Topic
 - The bot requires a running process, service-role environment, `BOT_TOKEN` and `ADMIN_CHAT_ID`. Repository source documents a polling worker and 90-day expiry function, but no current worker uptime, admin delivery or retention schedule is verified. No service-role environment value was read.
 - The existing Lila record is suitable as the sole sourced presentation example; its profile/contact match project-supplied information and the public Telegram page exists, but identity, qualification, availability and outcomes are not independently verified. Other ecological/craft service content is missing. The map has no verified pins and the live scheduled-event list was empty at the time of the check. No accounts, booking, payment, certification or personal workspace are included in this MVP.
 
-No hosted form submission, Telegram message, migration, deployment or release-triggering push ran during the current pass. [Vercel documents automatic deployments for connected Git pushes](https://vercel.com/docs/git); the mapped project settings confirm `main` as Production Branch. Pushing the current M2 candidate there would publish it. The remote delivery branch still has M1-era commit `eb0fda8`, while local M2 is at `b86d2fd`. M3 remains pending until the hosted schema is checked, 0017 is applied through an authorized path, hosted retries are safely verified, operator delivery/retention are verified, Production release is explicitly authorized, and the resulting production URL is checked on desktop and mobile.
+No hosted form submission, Telegram message, migration, deployment or release-triggering push ran during the current pass. [Vercel documents automatic deployments for connected Git pushes](https://vercel.com/docs/git); the mapped project settings confirm `main` as Production Branch. Pushing the current M2 candidate there would publish it. At that earlier checkpoint, remote tracking recorded M1-era `eb0fda8` and local M2 was at `b86d2fd`; this is not a fresh remote Git SHA check. M3 remains pending until the hosted schema is checked, 0017 is applied through an authorized path, hosted retries are safely verified, operator delivery/retention are verified, Production release is explicitly authorized, and the resulting production URL is checked on desktop and mobile.
 
 ## M3 accepted local SQL checkpoint — 2026-10-01
 
@@ -194,23 +194,24 @@ review, not a hosted or browser execution with 0017 absent.
 
 No hosted database was read or changed during the local SQL pass. The earlier hosted access
 limitations remain as recorded in the release-blocker notes above; an isolated
-cloud branch is optional and must not be created for this work. A hosted write
-test requires an already existing, positively verified non-production target
-and scoped test credentials. Before any frontend activation, verify that the
+cloud branch is optional and must not be created for this work. The existing hosted-write harness requires an already existing, positively verified non-production target
+and scoped test credentials. A controlled Production check instead needs separate explicit authorization for synthetic requests, any worker messages and cleanup, as recorded in the existing plan. Before any frontend activation, verify that the
 hosted table matches the current 0016-compatible column, constraint, RLS and
 grant contract and that the legacy ten-argument RPC is present. Apply only
 migration 0017 through an authorized path; if the schema differs, stop rather
 than replaying older migrations. Verify the hosted RPC before publishing the
 client. If the RPC is missing or fails, keep the existing unavailable/contact behavior and do not
 fall back to the legacy RPC. For rollback, disable online intake using the
-existing empty runtime configuration; a pre-M3 asset rollback alone restores
-the duplicate-prone legacy endpoint. Leave the additive migration and existing
+existing empty runtime configuration; retain the M3 keyed forms during disable/rollback. Reverting intake code to pre-M3 restores
+the duplicate-prone legacy endpoint and loses retry-aware manual-send safeguards. Leave the additive migration and existing
 data intact; do not remove the retry key or index to work around a client problem.
 The exact disable route and release order are in the existing milestone plan. Hosted receipt behavior,
 worker delivery/failure handling, the 90-day cleanup schedule and deployment
 remain unverified. M3 remains pending and no Production release ran.
 
-## Hosted read-only compatibility checkpoint — 2026-10-01
+## Earlier incomplete hosted read-only attempt — 2026-10-01
+
+Historical attempt; its access/unknown findings are superseded by the resumed checkpoint below.
 
 The current turn metadata reports `gpt-6.1-sol` with `high` effort. HEAD was
 `28e6513`; M1/M2 and the local SQL checkpoint were preserved without rerunning
@@ -284,3 +285,29 @@ next unfinished step. The user's foreground action restored a partial Functions
 read. The remaining access action is to restore this chat's existing Chrome
 browser-control connection/request-header-policy loading, preserving the same
 mapped accounts and permissions, so stable metadata reads can resume.
+
+## Resumed hosted read-only compatibility and release handoff — 2026-10-01
+
+Starting HEAD was `6aeae52`. Existing mapped Chrome profiles, named native Full Screen windows and live Supabase/Vercel identity/resource checks succeeded after the user's explicit retry request. This recovered the required reads; it does not prove that the separate Chrome incident was globally repaired. Two catalog-only SQL transactions used `BEGIN READ ONLY` and returned `transaction_read_only = on` on Lumeya `ccwvyjszlrrluzplizsu`, main Production, PostgreSQL 17.6. No private request rows/counts, credentials or mutation-function calls were read/executed. One auxiliary query initially hit a syntax error from partial editor draft replacement; select-all/delete cleared it and the corrected catalog query succeeded. Save was never clicked. The unsaved draft was explicitly discarded, with no remaining untitled draft/unsaved indicator and private snippet count unchanged at six.
+
+| Scoped catalog check | Observed result |
+| --- | --- |
+| Request table | 20 columns with expected types/nullability/defaults; postgres owner; ordinary table |
+| Constraints/indexes | 16 validated constraints (15 checks plus primary key); four valid baseline indexes |
+| Legacy, claim and expiry functions | Expected signatures; normalized bodies match current 0016 source; postgres owner, Definer, empty search paths |
+| Legacy RPC execution | postgres/service_role/anon/authenticated; no PUBLIC grant |
+| Claim/expiry execution | postgres/service_role only; browser roles denied |
+| RLS/table/column access | RLS enabled, FORCE RLS false, no policies; browser roles have no table/column read or direct-write grants and no SUPER/BYPASSRLS |
+| Public schema/triggers | No browser/server-role CREATE grant; PUBLIC has USAGE only; no user triggers on request table |
+| 0017 objects | Keyed RPC/helper, retry column and partial unique index absent |
+| Migration history | Schema and table absent, correcting the earlier empty-table description |
+| Privileged defaults | service_role table privileges include CRUD plus TRUNCATE/REFERENCES/TRIGGER/MAINTAIN; postgres function defaults grant service_role execution |
+| Retention scheduling | pg_cron extension and cron tables absent; mapped Vercel Cron Jobs enabled but no configured jobs |
+
+Normalized comparisons remove SQL comments/whitespace. Full scoped definitions were inspected; legacy/claim/expiry normalized body digests matched source (`b3460bdd`, `f3e6b511`, `6aa96eb0`). Column/type/nullability comparisons and constraint/index validity checks passed. **Classification: compatible prerequisites for applying only 0017.** This is not full production-schema/legacy-chain equivalence or hosted retry execution evidence. New functions may inherit service_role execution; replacing the legacy function retains its ACL. Browser/Public helper access must remain denied. No SQL/client fix was warranted; the candidate was preserved.
+
+Mapped Vercel project `lumeya` / `prj_Iwc9kpFxjbxfItBYjnD2SeKfkuAQ` in Our Projects matches local `.vercel/project.json`. Its Ready Production deployment is `W2XnNg4MpvirVZ39AiC5KEBL7fK6`, SHA `eb0fda82ff7ba35bb53daf74f353244daeff3ee5`, created Aug 31 from `codex/lumeya-public-mvp-rc`. The current overview names `main` for Production updates; RC is listed as Preview. Connected-repository display is `projects-workspace/lumeya`, matching local SSH origin; historical links retain the legacy name. No settings changed. Production alias `https://lumeya-wellbeing-discovery.vercel.app` freshly returned homepage/Services 200 with bytes matching the deployed SHA, and Join 404. Earlier seven-asset checks remain dated evidence; no fresh Events execution or remote Git-head lookup occurred.
+
+Hosted worker/expiry definitions and grants are verified, with batch default 20, SKIP LOCKED claims, 15-minute reclaim and eight-attempt cap. Actual bot hosting, uptime, Telegram delivery and any external retention caller/execution remain unknown. No bot process, notification or cleanup started. An expiry timestamp does not prove scheduled deletion.
+
+The existing rollout plan records completed prerequisites and the next separately authorized step: apply only 0017, verify ACL/index/PostgREST visibility, then authorize controlled receipts/delivery/cleanup and frontend release. The existing live harness rejects Production and requires a confirmed existing non-production target; it is optional and no new branch is assumed. Disable via empty shared runtime configuration while retaining M3 keyed forms and keys; do not roll intake back to legacy code. Missing-RPC behavior remains source-reviewed only. M1/M2 and prior local SQL/catalog/editorial/full verify results were retained without rerunning unchanged suites. This resumed pass changed documentation only; scoped whitespace and local Markdown-link target checks passed; the historical May plan was preserved byte-for-byte. No remote write, submission, migration application, Telegram message, push or deployment ran. M3 hosted end-to-end acceptance remains pending.

@@ -16,13 +16,13 @@ The repository still contains private-platform UI and bot workflows for future w
 
 `suggest_listing` and `looking_for` requests use the isolated `public_discovery_requests` table. Public roles cannot select from, update, or delete this table. The M3 browser candidate calls `submit_idempotent_public_discovery_request`, a validated insert-only `SECURITY DEFINER` function with an empty `search_path`. The earlier ten-argument `submit_public_discovery_request` remains available for compatibility with older callers; it has no retry key and must not be used by new forms.
 
-Migration `0017_idempotent_public_discovery_requests.sql` adds a private nullable UUID key and partial unique index without changing existing rows or the separate IP/user-agent rate limit. An exact repeat with the same key and normalized request returns the original receipt ID. Reusing that key with changed content returns only a generic conflict; a different key creates a separate request. The key is not added to `source_page`, public exports or operator message text. M3 executed the actual SQL only in disposable local Supabase PostgreSQL databases and performed no hosted application. The 2026-10-01 hosted public Functions list lacks the keyed endpoint/helper; the complete table and grant prerequisites remain unread.
+Migration `0017_idempotent_public_discovery_requests.sql` adds a private nullable UUID key and partial unique index without changing existing rows or the separate IP/user-agent rate limit. An exact repeat with the same key and normalized request returns the original receipt ID. Reusing that key with changed content returns only a generic conflict; a different key creates a separate request. The key is not added to `source_page`, public exports or operator message text. M3 executed the actual SQL only in disposable local Supabase PostgreSQL databases and performed no hosted application. Resumed catalog reads on 2026-10-01 verified compatible scoped table/function/grant prerequisites; the keyed endpoint/helper and retry column/index remain absent. No hosted migration or valid RPC invocation occurred.
 
 The browser validates required values, length, enum, and URL format. The database repeats those checks. A honeypot field provides basic automated-spam filtering. The RPC also limits a browser fingerprint to five requests per hour when proxy headers are available. This is containment, not a replacement for edge-level abuse protection.
 
 Form values are not autosaved while the user types. Before an online attempt, the current values and stable retry key are saved in that browser's `localStorage` for up to seven days; online submission is blocked when storage cannot keep the key across a reload. An uncertain online receipt keeps the same key for retry and hides the Telegram send option until an operator checks for the first receipt. A changed payload is rejected under the previous key, then requires a new explicit submit to create a distinct request. Local drafts are not encrypted. Forms tell users not to submit passwords, payment data, medical records, or other sensitive information.
 
-Stored requests expire after 90 days. `delete_expired_public_discovery_requests` is callable only by the service role and must be scheduled by the production operator. The bot claims pending notifications with `FOR UPDATE SKIP LOCKED`, sends them to `ADMIN_CHAT_ID`, and records success or retry state.
+Stored requests receive an `expires_at` default of creation plus 90 days; that timestamp does not delete them automatically. `delete_expired_public_discovery_requests` permits postgres/service_role execution and needs a scheduled server caller. Supabase has no pg_cron and the mapped Vercel project has no configured cron jobs; any external scheduler and actual deletion remain unverified. The bot claims pending notifications with `FOR UPDATE SKIP LOCKED`, sends them to `ADMIN_CHAT_ID`, and records success or retry state.
 
 ## Migration status
 
@@ -34,18 +34,11 @@ submit through the validated request RPC. One disposable request was submitted
 and removed. Earlier M3 read-only checks also confirmed anonymous request-table
 read denial; no hosted valid RPC call was made.
 
-The historical remote migration table is empty even though legacy schema
-objects already exist. Treat `bot/schema.sql` and migrations `0002`–`0015` as a
-legacy reconstruction chain; do not reset/replay it on the live database.
-On 2026-10-01, the actual 0017 SQL ran successfully in an isolated database
-inside an already-running local Supabase PostgreSQL 17.6 container. Its minimal
-pre-0017 request table was reconstructed from the documented 0016 table
-definition and contained one synthetic legacy row. The database was removed
-after checks. This does not prove the hosted schema matches that reconstruction.
-The later hosted read-only checkpoint verified the exact account/project
-overview and public function names/signatures/Definer modes. The keyed endpoint
-and internal helper were absent from that list. Complete definitions, ACLs and
-table prerequisites remain unknown. No hosted mutation ran in either pass.
+Current metadata on 2026-10-01 shows `supabase_migrations` and its `schema_migrations` table are **absent**, correcting the earlier empty-table description. Legacy objects exist. Treat `bot/schema.sql` and migrations `0002`–`0015` as a reconstruction chain; do not reset/replay it on the live database.
+
+Actual 0017 SQL passed in two disposable databases inside the already-running local Supabase PostgreSQL 17.6 container, using minimal documented 0016 table prerequisites and synthetic data. Both databases were removed. Later hosted catalog-only read-only transactions verified the scoped 20-column table/defaults, 16 validated constraints, four valid indexes and normalized legacy/worker bodies, with postgres ownership and empty search paths. RLS is enabled with no policies; anon/authenticated have no table/column read or direct-write privileges or public-schema CREATE permission. This is compatible for applying only 0017; full legacy-chain equivalence and hosted retry/receipt behavior remain unproven.
+
+Existing service_role table grants include TRUNCATE, REFERENCES, TRIGGER and MAINTAIN beyond source minimum CRUD. Legacy RPC execution permits postgres/service_role/anon/authenticated without PUBLIC; claim/expiry permit postgres/service_role only. Postgres function default ACLs grant server-role execution, so new 0017 functions may inherit it; helper execution must remain denied to browser roles/PUBLIC. Replacing the legacy function retains ownership and ACLs ([PostgreSQL CREATE FUNCTION](https://www.postgresql.org/docs/17/sql-createfunction.html)). These existing privileged grants were recorded, not changed. No private requests or environment secrets were read and no mutation function was invoked.
 
 The source has a notification worker that calls `claim_public_discovery_requests`
 in batches, sends the request to `ADMIN_CHAT_ID`, and records notified/failed
@@ -71,7 +64,7 @@ The website fallback opens the bot with `start=public_request`. The user must pa
 
 ## Known limits before broad launch
 
-- Live Supabase reachability, public grants, RLS, and request insertion are verified; bot availability and the final notification hop still require external verification.
+- Current hosted catalog grants/RLS and scoped prerequisites are verified read-only. Request insertion evidence is historical (2026-08-31); current keyed receipt behavior, bot availability and final notification hop remain unverified.
 - The public endpoint has validation, a honeypot and a basic database rate limit, but no CAPTCHA/Turnstile, reputation check or moderation queue UI.
 - Telegram fallback also needs network access; it cannot deliver while the device is fully offline.
 - The in-memory Telegram conversation session can be lost when the bot process restarts.
