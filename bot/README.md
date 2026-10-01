@@ -1,6 +1,6 @@
 # Lumeya Telegram Bot
 
-This bot currently provides Lumeya's public request notification path while legacy scheduling and club workflows remain dormant on the public website.
+This bot contains Lumeya's public request notification worker. Source code is not evidence of a running host or delivery. The accepted MVP uses manual operator receipt review; automatic notification and retention execution remain post-MVP limitations. Legacy scheduling and club workflows remain dormant on the public website.
 
 ## Setup Instructions
 
@@ -55,15 +55,7 @@ The bot fails closed when any required production variable is missing. The
 stores the request when possible, and directly notifies `ADMIN_CHAT_ID` even if
 database persistence fails.
 
-Migration 0016 was historically applied to the dedicated Lumeya project. The
-actual `0017_idempotent_public_discovery_requests.sql` file has been executed
-only in a disposable local Supabase PostgreSQL database with a reconstructed
-0016-compatible table and synthetic data. No hosted database was changed. The
-disposable live contract writes test rows, so run it only against an already
-existing isolated non-production target whose exact ref and relationship to
-Production have been verified. A cloud branch is optional and must not be
-created for this test. The script rejects the known Production ref and requires
-the URL host to match the confirmed branch ref.
+The public forms require the keyed RPC from migration 0017. Current application and acceptance evidence is recorded in [PROJECT_STATE.md](../PROJECT_STATE.md). The existing disposable live contract below remains guarded for an already-existing, positively verified non-production target; do not weaken it or create a cloud branch for this work. It rejects the known Production ref and checks that the URL matches the confirmed branch.
 
 Add these test-only values to the environment when the branch-specific
 credentials are available; do not reuse Production credentials or edit the
@@ -92,7 +84,6 @@ unconfirmed project. If no safe existing hosted target or its scoped credentials
 are available, skip this live test; local SQL validation does not prove hosted
 PostgREST behavior.
 
-## Deployment
+## Operational boundary
 
-To keep the bot running 24/7, you should deploy it to a service like **Render**, **Railway**, or **Heroku**. 
-Just link your GitHub repository to one of those services, set the Build Command to `npm install`, the Start Command to `npm start`, and add your Environment Variables in their dashboard.
+No running bot host, process-manager configuration or retention caller is mapped in the inspected repository. The static Vercel release excludes `bot/`; GitHub runs verification only. Starting this bot also starts other legacy workers, so it is not a bounded public-request activation path by itself. A future operational task needs an explicitly mapped and authorized existing runtime before claiming automatic delivery or scheduled deletion. The MVP's manual private handoff is documented in [the catalog workflow](../docs/catalog-publishing.md); no new hosting or scheduler is part of MVP acceptance.

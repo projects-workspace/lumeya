@@ -64,11 +64,11 @@ The website fallback opens the bot with `start=public_request`. The user must pa
 
 ## Known limits before broad launch
 
-- Current catalog grants/RLS, keyed PostgREST behavior and synthetic browser receipt persistence passed on 2026-10-01. The six marked test receipts remained pending with zero notification attempts during observation; bot execution and the final notification hop remain unverified.
+- Current catalog grants/RLS, keyed PostgREST behavior and synthetic browser receipt persistence passed on 2026-10-01. The six marked test receipts remained pending with zero notification attempts during observation; bot execution and the final notification hop remain explicit post-MVP operational limitations. Final acceptance removed the six synthetic rows after confirmation and verified zero remain.
 - The public endpoint has validation, a honeypot and a basic database rate limit, but no CAPTCHA/Turnstile, reputation check or moderation queue UI.
 - Telegram fallback also needs network access; it cannot deliver while the device is fully offline.
 - The in-memory Telegram conversation session can be lost when the bot process restarts.
-- Administrative review currently depends on direct database access and Telegram notification. The notification worker and retention cleanup require a continuously running bot process or equivalent scheduler.
+- The accepted operator path uses authorized private database export/import and manual CLI review/publication. Automatic notifications and retention cleanup need a separately verified worker/caller and remain post-MVP limitations; no running host or schedule is mapped here.
 - Legacy private-platform code remains in the repository. Re-enabling it requires real authentication, new authorization tests, and an RLS review; public caller-supplied IDs must not be restored as identity.
 
 Before exposing the forms to high traffic, add edge-level rate limiting or Turnstile and verify the 90-day cleanup schedule.
