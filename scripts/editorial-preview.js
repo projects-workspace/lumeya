@@ -32,14 +32,20 @@ function createPreview({ root = ROOT, privateDir }) {
         }
         const receipt = store.receive(JSON.parse(body));
         return reply(200, { data: receipt });
-      } catch { return reply(400, { error: 'request_not_saved_check_fields_and_retry' }); }
+      } catch (error) {
+        if (error.message === 'idempotency_key_conflict') return reply(409, { error: 'idempotency_key_conflict' });
+        return reply(400, { error: 'request_not_saved_check_fields_and_retry' });
+      }
     }
     if (!['GET', 'HEAD'].includes(req.method)) return reply(405, { error: 'read_only_preview' });
     if (pathname === '/__lumeya/config.js') {
       return reply(200, `window.LumeyaLocalIntake = Object.freeze({ mode: 'local-preview', submit: async function(payload) {
-        var response = await fetch('/__lumeya/intake', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Lumeya-Local': '1' }, body: JSON.stringify(payload) });
-        var result = await response.json();
-        if (!response.ok || result.error) throw new Error('local_receipt_failed');
+      var response = await fetch('/__lumeya/intake', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Lumeya-Local': '1' }, body: JSON.stringify(payload) });
+      var result = await response.json();
+      if (!response.ok || result.error) {
+        var code = result.error === 'idempotency_key_conflict' ? result.error : 'local_receipt_failed';
+        var error = new Error(code); error.code = code === 'idempotency_key_conflict' ? 'P0001' : undefined; throw error;
+      }
         return result;
       }});`, TYPES['.js']);
     }

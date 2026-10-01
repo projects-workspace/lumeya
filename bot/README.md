@@ -55,15 +55,40 @@ The bot fails closed when any required production variable is missing. The
 stores the request when possible, and directly notifies `ADMIN_CHAT_ID` even if
 database persistence fails.
 
-Migration 0016 is applied to the confirmed dedicated Lumeya project. To repeat
-the disposable service-role boundary test, run:
+Migration 0016 was historically applied to the dedicated Lumeya project. The
+current `0017_idempotent_public_discovery_requests.sql` file is a local candidate
+and has not been applied. The disposable live contract writes test rows, so run
+it only after an operator confirms an existing isolated non-production branch
+in Supabase by checking its exact ref, branch type, parent and Production Branch.
+The script rejects the known Production ref and requires the URL host to match
+the confirmed branch ref.
+
+Add these test-only values to the environment when the branch-specific
+credentials are available; do not reuse Production credentials or edit the
+bot's regular `SUPABASE_URL`/service key to point at a test branch:
+
+```env
+LUMEYA_TEST_SUPABASE_URL=https://<existing-branch-ref>.supabase.co
+LUMEYA_TEST_SUPABASE_PUBLISHABLE_KEY=<branch-publishable-key>
+LUMEYA_TEST_SUPABASE_SERVICE_ROLE_KEY=<branch-service-role-key>
+LUMEYA_TEST_SUPABASE_BRANCH_REF=<exact-existing-branch-ref>
+LUMEYA_TEST_SUPABASE_BRANCH_CONFIRMATION="I verified <exact-existing-branch-ref> is an existing isolated non-production branch"
+```
+
+Then run from `bot/`:
 
 ```sh
 npm run test:public-mvp
 ```
 
-The test creates and removes one disposable request while checking the browser
-RLS/RPC boundary. Do not run it against another project.
+The test creates, retries, conflicts and removes isolated synthetic rows; it
+checks that exact retries preserve one receipt, changed content does not
+overwrite it, distinct keys create distinct rows, direct anonymous reads remain
+denied, and invalid content is rejected. Assertions and cleanup logs redact
+request content, keys and receipt IDs. Do not run it against Production or any
+unconfirmed project. If the existing branch cannot be read or its branch-scoped
+credentials are unavailable, stop before running it; do not substitute a local
+preview result for the live check.
 
 ## Deployment
 

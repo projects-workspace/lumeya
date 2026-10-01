@@ -11,7 +11,8 @@
     'form#suggest-listing-form',
     'form#looking-for-form'
   ].join(',');
-  const RPC_NAME = 'submit_public_discovery_request';
+  const RPC_NAME = 'submit_idempotent_public_discovery_request';
+  const IDEMPOTENCY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const TELEGRAM_URL = 'https://t.me/santioago_bot?start=public_request';
   const DRAFT_PREFIX = 'lumeya-public-request-draft:';
   const DRAFT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -161,10 +162,13 @@
   }
 
   function rpcPayload(request) {
+    const idempotencyKey = request.idempotencyKey;
+    if (!IDEMPOTENCY_PATTERN.test(idempotencyKey || '')) throw new ValidationError('A safe retry key could not be created. Nothing has been sent.');
     return {
       p_request_type: request.requestType,
       p_subject: request.subject,
       p_details: request.details,
+      p_idempotency_key: idempotencyKey,
       p_listing_type: request.listingType,
       p_location: request.location,
       p_preference: request.preference,
@@ -183,7 +187,7 @@
       : `${DRAFT_PREFIX}${requestTypeFor(form) || form.id || 'unknown'}`;
   }
 
-  function saveDraft(form) {
+  function saveDraft(form, idempotencyKey = null) {
     try {
       const values = formValues(form);
       delete values._company;
@@ -191,6 +195,7 @@
       delete values.website;
       localStorage.setItem(draftKey(form), JSON.stringify({
         values,
+        idempotencyKey: IDEMPOTENCY_PATTERN.test(idempotencyKey || '') ? idempotencyKey : null,
         savedAt: new Date().toISOString()
       }));
       return true;
@@ -221,6 +226,8 @@
       clearDraft(form);
       return false;
     }
+
+    if (IDEMPOTENCY_PATTERN.test(draft.idempotencyKey || '')) form.dataset.idempotencyKey = draft.idempotencyKey;
 
     Object.entries(draft.values).forEach(([name, value]) => {
       const field = form.elements.namedItem(name);
@@ -346,7 +353,7 @@
     }
   }
 
-  function showFallback(form, request) {
+  function showFallback(form, request, { allowManualSend = true } = {}) {
     const fallback = fallbackElement(form);
     fallback.replaceChildren();
     fallback.hidden = false;
@@ -365,21 +372,28 @@
           // Preserve the last valid submission snapshot if fields were edited invalidly.
         }
         await copyText(requestSummary(currentRequest));
-        setStatus(form, 'Details copied; nothing has been sent. Open Telegram, paste the details, and send the message to the Lumeya operator.', 'draft');
+        setStatus(form, allowManualSend
+          ? 'Details copied; nothing has been sent. Open Telegram, paste the details, and send the message to the Lumeya operator.'
+          : 'Details copied; nothing has been sent. The earlier receipt is uncertain; do not send a second copy until an operator checks whether it arrived.', 'draft');
       } catch (error) {
         setStatus(form, 'Copy failed. Select the details manually or retry copying. Nothing has been sent.', 'error');
       }
     });
 
-    const telegramLink = document.createElement('a');
-    telegramLink.className = 'button button--primary public-request-telegram';
-    telegramLink.href = TELEGRAM_URL;
-    telegramLink.target = '_blank';
-    telegramLink.rel = 'noopener noreferrer';
-    telegramLink.textContent = 'Open Telegram';
-    telegramLink.addEventListener('click', () => setStatus(form, 'Opening Telegram does not send the request. Paste the copied details and press Send in the chat with the Lumeya operator.', 'draft'));
-
-    fallback.append(copyButton, telegramLink);
+    if (allowManualSend) {
+      const telegramLink = document.createElement('a');
+      telegramLink.className = 'button button--primary public-request-telegram';
+      telegramLink.href = TELEGRAM_URL;
+      telegramLink.target = '_blank';
+      telegramLink.rel = 'noopener noreferrer';
+      telegramLink.textContent = 'Open Telegram';
+      telegramLink.addEventListener('click', () => setStatus(form, 'Opening Telegram does not send the request. Paste the copied details and press Send in the chat with the Lumeya operator.', 'draft'));
+      fallback.append(copyButton, telegramLink);
+    } else {
+      const notice = document.createElement('span');
+      notice.textContent = 'Copying does not send. The receipt is uncertain; do not send a second copy until the operator confirms whether it arrived.';
+      fallback.append(copyButton, notice);
+    }
   }
 
   function setSubmitting(form, submitting) {
@@ -405,13 +419,61 @@
       return;
     }
 
-    const draftSaved = saveDraft(form);
-    const draftMessage = draftSaved ? 'A draft is saved in this browser for seven days.' : 'Browser storage is unavailable; keep or copy these details before leaving.';
+    const onlineRouteAvailable = routeAvailable();
+    let idempotencyKey = form.dataset.idempotencyKey;
+    if (!IDEMPOTENCY_PATTERN.test(idempotencyKey || '')) {
+      try {
+        const previousDraft = JSON.parse(localStorage.getItem(draftKey(form)) || 'null');
+        idempotencyKey = IDEMPOTENCY_PATTERN.test(previousDraft?.idempotencyKey || '') ? previousDraft.idempotencyKey : '';
+      } catch (error) {
+        idempotencyKey = '';
+      }
+    }
+    if (onlineRouteAvailable) {
+      if (!IDEMPOTENCY_PATTERN.test(idempotencyKey || '')) {
+        try {
+          if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            idempotencyKey = window.crypto.randomUUID();
+          } else if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+            const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+            idempotencyKey = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+          } else {
+            throw new Error('secure_random_unavailable');
+          }
+        } catch (error) {
+          const draftSaved = saveDraft(form);
+          setStatus(form, (draftSaved ? 'A draft is saved in this browser. ' : 'Browser storage is unavailable. ') + 'This browser cannot create a safe retry key, so nothing was sent.', 'error');
+          showFallback(form, request);
+          return;
+        }
+      }
+      form.dataset.idempotencyKey = idempotencyKey;
+    } else if (!IDEMPOTENCY_PATTERN.test(idempotencyKey || '')) {
+      idempotencyKey = null;
+    }
+    const hasPreviousSubmissionKey = IDEMPOTENCY_PATTERN.test(idempotencyKey || '');
+    const draftSaved = saveDraft(form, idempotencyKey);
+    const draftMessage = draftSaved
+      ? `This browser saved a draft${idempotencyKey ? ' with its retry key' : ''} for up to seven days.`
+      : 'Browser storage is unavailable.';
     hideFallback(form);
 
-    if (!routeAvailable()) {
-      setStatus(form, (navigator.onLine ? 'Online requests are not configured here. ' : 'You are offline. ') + draftMessage + ' Nothing has been sent; choose a manual option below.', 'error');
-      showFallback(form, request);
+    if (onlineRouteAvailable && !draftSaved) {
+      setStatus(form, 'Nothing was sent in this attempt because this browser cannot keep the retry key across a reload. If an earlier online attempt had an uncertain receipt, ask an operator to check before sending manually. Otherwise use the manual option once or enable browser storage and retry here.', 'error');
+      showFallback(form);
+      return;
+    }
+
+    if (!onlineRouteAvailable) {
+      const routeMessage = navigator.onLine ? 'Online requests are not configured here. ' : 'You are offline. ';
+      const nextStep = hasPreviousSubmissionKey
+        ? 'An earlier online attempt may have arrived; do not send a second copy until an operator checks whether it arrived.'
+        : 'Nothing was sent; choose a manual option below.';
+      setStatus(form, routeMessage + draftMessage + ' ' + nextStep, 'error');
+      showFallback(form, request, { allowManualSend: !hasPreviousSubmissionKey });
       return;
     }
 
@@ -420,7 +482,7 @@
     try {
       let timer;
       const result = await Promise.race([
-        localIntake() ? localIntake().submit(rpcPayload(request)) : window.supabaseClient.rpc(RPC_NAME, rpcPayload(request)),
+        localIntake() ? localIntake().submit(rpcPayload({ ...request, idempotencyKey })) : window.supabaseClient.rpc(RPC_NAME, rpcPayload({ ...request, idempotencyKey })),
         new Promise((resolve, reject) => { timer = setTimeout(() => reject(new Error('receipt_timeout')), 15000); })
       ]).finally(() => clearTimeout(timer));
       const { data, error } = result;
@@ -429,13 +491,24 @@
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receiptId || '')) throw new Error('receipt_not_confirmed');
 
       clearDraft(form);
+      delete form.dataset.idempotencyKey;
       hideFallback(form);
       setStatus(form, localIntake()
         ? 'Saved to the operator’s private local queue. Receipt: ' + receiptId + '. This is a local preview; no hosted receipt or Telegram delivery is confirmed. The operator must review before publication.'
         : 'Saved to Lumeya’s private request queue. Receipt: ' + receiptId + '. A Lumeya operator reviews it and follows up using your contact. Notification delivery is not confirmed; this does not book a service or publish a listing.', 'success');
     } catch (error) {
-      setStatus(form, 'A receipt could not be confirmed. ' + draftMessage + ' Retry the same details or choose a manual option; the operator checks duplicates before publication.', 'error');
-      showFallback(form, request);
+      if (error?.code === 'P0001' && error?.message === 'idempotency_key_conflict') {
+        delete form.dataset.idempotencyKey;
+        saveDraft(form);
+        setStatus(form, 'These details differ from the earlier request using this retry key. The earlier receipt remains; the changed request was not sent. Submit again to create a separate request.', 'error');
+        showFallback(form, request, { allowManualSend: false });
+      } else {
+        const recovery = draftSaved
+          ? 'This browser saved the same retry key. Retry unchanged details here; do not send a second Telegram copy until an operator checks the first receipt.'
+          : 'Storage is unavailable; keep this page open and retry unchanged details here. Reloading loses the retry key, so ask an operator to check before resending.';
+        setStatus(form, 'A receipt could not be confirmed. ' + recovery, 'error');
+        showFallback(form, request, { allowManualSend: false });
+      }
     } finally {
       setSubmitting(form, false);
     }

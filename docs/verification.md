@@ -99,16 +99,21 @@ not replace—secret scanning and production environment review.
   tests, Supabase security checks, preview-deployment HTTP checks, and
   post-deploy production checks.
 
-After applying migration 0016 to the confirmed Lumeya project, run the disposable
-live database contract from `bot/`:
+For the M3 live database contract, first identify an already-existing Lumeya
+branch and verify its exact ref, branch type, parent and Production Branch in
+Supabase. Apply only migration 0017 to that isolated non-production branch; do
+not reset/replay the legacy migration chain. Then use branch-scoped credentials
+and run the disposable contract from `bot/`:
 
 ```sh
 npm run test:public-mvp
 ```
 
-This requires the dedicated project's URL, publishable key and service-role key
-in the local environment. It must never be run against another ecosystem
-project.
+The test-specific `LUMEYA_TEST_SUPABASE_*` URL, publishable key, service-role
+key, branch ref and explicit confirmation must all identify that branch. The
+script rejects the known Production ref and a mismatching URL host, and removes
+rows only by its fresh synthetic keys. Never run it against Production or
+another ecosystem project.
 
 ## M2 focused checks
 
@@ -140,3 +145,41 @@ For tester comments, use the existing `suggest.html#looking-for` form. Set Topic
 - The existing Lila record is suitable as the sole sourced presentation example; its profile/contact match project-supplied information and the public Telegram page exists, but identity, qualification, availability and outcomes are not independently verified. Other ecological/craft service content is missing. The map has no verified pins and the live scheduled-event list was empty at the time of the check. No accounts, booking, payment, certification or personal workspace are included in this MVP.
 
 No hosted form submission, Telegram message, migration, deployment or release-triggering push ran during these checks. [Vercel documents automatic deployments for connected Git pushes](https://vercel.com/docs/git); the mapped project settings confirm `main` as Production Branch. Pushing the current M2 candidate there would publish it. The remote delivery branch still has M1-era commit `eb0fda8`, while local M2 is at `b86d2fd`. M3 is not accepted until the hosted retry defect is resolved and safely tested, operator delivery/retention are verified, the user explicitly authorizes the Production push, and the M2 candidate's production URL is verified on desktop and mobile.
+
+## M3 local idempotency candidate — 2026-10-01
+
+The retry defect has a local implementation candidate. Additive migration
+`bot/migrations/0017_idempotent_public_discovery_requests.sql` adds a private
+nullable UUID key and partial unique index, keeps request-fingerprint rate
+limiting separate, and preserves the legacy ten-argument RPC. New forms call
+`submit_idempotent_public_discovery_request`; exact same-key/content retries
+return the first receipt, changed content under that key is rejected with a
+generic conflict, and a distinct key creates a separate request. The key is
+stored in the private request row and browser draft, not in `source_page`, the
+public catalogue or operator notification text. The client blocks online sends
+when browser storage cannot preserve a retry key across reloads; when a receipt
+is uncertain it retries with that key and suppresses the manual Telegram-send
+option until an operator checks for the first receipt.
+
+The existing Supabase management branch-list call was denied again. A
+read-only check of the mapped browser dashboard could not continue because the
+Mac was locked and automatic unlock failed. No existing non-production branch
+ref or branch-specific credentials could be verified. Migration 0017 was not
+applied; the new live contract was not run. Production and stored rows were
+untouched. The local loopback test uses isolated
+filesystem fixtures and proves one receipt survives a server restart, an exact
+retry returns the same ID without changing queue bytes, a conflict leaves the
+original intact, and a distinct key creates a second receipt. Generic errors
+contain no request text, key or receipt ID. This is local preview evidence only;
+it does not prove PostgreSQL execution, deployed RPC behavior or hosted receipt
+persistence.
+
+To run the live check, provide access to an existing Supabase branch so its ref,
+branch type, parent and Production Branch can be verified, then provide
+branch-scoped test keys after migration 0017 is applied there. Set the
+`LUMEYA_TEST_SUPABASE_*` variables documented in `bot/README.md`. No branch may
+be created for this test. The worker source claims pending requests in batches,
+sends them to `ADMIN_CHAT_ID` and records notified/failed status, with the
+migration limiting attempts; no worker runtime, Telegram receipt or 90-day
+cleanup schedule was verified. M3 remains pending, and this candidate is neither
+hosted nor a Production release.

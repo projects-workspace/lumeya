@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { validateCatalog, renderBrowserFile } = require('./catalog');
 const ROOT = path.resolve(__dirname, '..');
 const EDITABLE = new Set(['services', 'providers', 'places', 'eventFormats', 'scheduledEvents']);
+const IDEMPOTENCY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const hash = value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fail = code => { throw new Error(code); };
 
@@ -35,7 +36,7 @@ function privateDirectory(directory, root = ROOT) {
 
 function normalizeRequest(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) fail('invalid_request');
-  const allowed = new Set(['p_request_type', 'p_subject', 'p_details', 'p_listing_type', 'p_location', 'p_preference', 'p_contact', 'p_reference_url', 'p_source_page', 'p_honeypot']);
+  const allowed = new Set(['p_request_type', 'p_subject', 'p_details', 'p_idempotency_key', 'p_listing_type', 'p_location', 'p_preference', 'p_contact', 'p_reference_url', 'p_source_page', 'p_honeypot']);
   if (Object.keys(payload).some(key => !allowed.has(key))) fail('unexpected_request_field');
   const text = (key, min, max) => {
     if (payload[key] != null && typeof payload[key] !== 'string') fail('invalid_request_field');
@@ -46,12 +47,15 @@ function normalizeRequest(payload) {
   const type = text('p_request_type', 1, 30);
   if (!['suggest_listing', 'looking_for'].includes(type)) fail('unsupported_request_type');
   if (text('p_honeypot', 0, 500)) fail('request_rejected');
+  const sourcePage = text('p_source_page', 0, 500);
+  const idempotencyKey = text('p_idempotency_key', 0, 36);
+  if (idempotencyKey && !IDEMPOTENCY_PATTERN.test(idempotencyKey)) fail('invalid_idempotency_key');
   const request = {
     p_request_type: type, p_subject: text('p_subject', 2, 160),
     p_details: text('p_details', 10, 2500), p_listing_type: text('p_listing_type', 0, 30),
     p_location: text('p_location', 0, 160), p_preference: text('p_preference', 0, 30),
     p_contact: text('p_contact', 3, 240), p_reference_url: text('p_reference_url', 0, 500),
-    p_source_page: text('p_source_page', 0, 500),
+    p_source_page: sourcePage, idempotencyKey,
   };
   const contact = request.p_contact;
   const phoneDigits = contact.replace(/\D/g, '').length;
@@ -100,19 +104,23 @@ function openStore(directory, root = ROOT) {
     directory,
     receive(payload, provenance = { channel: 'local-preview' }) {
       const request = normalizeRequest(payload);
+      const idempotencyKey = request.idempotencyKey;
+      delete request.idempotencyKey;
       const intent = requestIntent(request);
       return transact(state => {
         const fingerprint = hash(request);
-        const existing = state.receipts.find(item => item.fingerprint === fingerprint || (provenance.remoteId && item.provenance.remoteId === provenance.remoteId));
+        const existing = idempotencyKey
+          ? state.receipts.find(item => item.idempotencyKey === idempotencyKey)
+          : state.receipts.find(item => item.fingerprint === fingerprint || (provenance.remoteId && item.provenance.remoteId === provenance.remoteId));
         if (existing) {
-          if (existing.fingerprint !== fingerprint) fail('remote_receipt_changed_requires_review');
+          if (existing.fingerprint !== fingerprint) fail(idempotencyKey ? 'idempotency_key_conflict' : 'remote_receipt_changed_requires_review');
           if (provenance.remoteId && provenance.remoteId !== existing.provenance.remoteId && !(existing.provenance.duplicateRemoteIds || []).includes(provenance.remoteId)) {
             existing.provenance.duplicateRemoteIds = (existing.provenance.duplicateRemoteIds || []).concat(provenance.remoteId);
             existing.provenance.duplicateReceipts = (existing.provenance.duplicateReceipts || []).concat(structuredClone(provenance));
           }
           return { id: existing.id, duplicate: true, persisted: true, channel: provenance.channel };
         }
-        const item = { id: provenance.remoteId || crypto.randomUUID(), fingerprint, request, intent, provenance,
+        const item = { id: provenance.remoteId || crypto.randomUUID(), fingerprint, idempotencyKey, request, intent, provenance,
           status: 'pending', audit: [] };
         recordAudit(item, 'received');
         state.receipts.push(item);

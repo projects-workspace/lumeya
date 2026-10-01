@@ -165,6 +165,58 @@ test('real loopback HTTP intake persists across server restart; anonymous reads/
   const html = await (await fetch(url())).text(); assert.match(html, /__lumeya\/config\.js/); assert.ok(!html.includes(PRIVATE_SENTINEL));
 });
 
+test('keyed retries return one private receipt after restart; conflicts and invalid requests preserve bytes without leaking values', async t => {
+  const f = fixture(t);
+  const start = async () => { const server = createPreview({ root: f.root, privateDir: f.privateDir }); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); return server; };
+  let server = await start();
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = () => 'http://127.0.0.1:' + server.address().port;
+  const submit = payload => fetch(url() + '/__lumeya/intake', { method: 'POST', headers: { origin: url(), 'Content-Type': 'application/json', 'X-Lumeya-Local': '1' }, body: JSON.stringify(payload) });
+  const key = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const otherKey = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const payload = request({ p_idempotency_key: key, p_details: `Private synthetic request ${PRIVATE_SENTINEL}; never publish.` });
+  const firstResponse = await submit(payload);
+  assert.equal(firstResponse.status, 200);
+  const firstBody = await firstResponse.json();
+  const firstId = firstBody.data.id;
+  assert.match(firstId, /^[0-9a-f-]{36}$/i);
+  assert.equal(firstBody.data.persisted, true);
+  const savedBytes = queueBytes(f);
+
+  await new Promise(resolve => server.close(resolve));
+  server = await start();
+  const repeatedResponse = await submit(payload);
+  assert.equal(repeatedResponse.status, 200);
+  const repeatedBody = await repeatedResponse.json();
+  assert.equal(repeatedBody.data.id, firstId);
+  assert.equal(repeatedBody.data.duplicate, true);
+  assert.equal(queueBytes(f), savedBytes);
+
+  const conflictResponse = await submit({ ...payload, p_details: 'A changed synthetic request reusing the previous key.' });
+  const conflictText = await conflictResponse.text();
+  assert.equal(conflictResponse.status, 409);
+  assert.equal(conflictText, '{"error":"idempotency_key_conflict"}');
+  assert.ok(!conflictText.includes(firstId) && !conflictText.includes(key) && !conflictText.includes(PRIVATE_SENTINEL));
+  assert.equal(queueBytes(f), savedBytes);
+
+  const distinctResponse = await submit({ ...payload, p_idempotency_key: otherKey });
+  assert.equal(distinctResponse.status, 200);
+  const distinctBody = await distinctResponse.json();
+  assert.notEqual(distinctBody.data.id, firstId);
+  assert.equal(distinctBody.data.duplicate, false);
+  assert.equal(f.store.list().length, 2);
+  const publicExport = fs.readFileSync(path.join(f.root, 'discovery-data.js'), 'utf8');
+  assert.ok(!publicExport.includes(key) && !publicExport.includes(otherKey) && !publicExport.includes(PRIVATE_SENTINEL));
+
+  const beforeInvalid = queueBytes(f);
+  const invalidResponse = await submit({ ...payload, p_idempotency_key: 'not-a-uuid' });
+  const invalidText = await invalidResponse.text();
+  assert.equal(invalidResponse.status, 400);
+  assert.equal(invalidText, '{"error":"request_not_saved_check_fields_and_retry"}');
+  assert.ok(!invalidText.includes(firstId) && !invalidText.includes(key) && !invalidText.includes(PRIVATE_SENTINEL));
+  assert.equal(queueBytes(f), beforeInvalid);
+});
+
 test('CLI operator inspection stays in private files, status output contains no submission or notes; publisher rejects private/nested fields', t => {
   const f = fixture(t); const received = f.store.receive(request({ p_details: PRIVATE_SENTINEL }));
   const output = execFileSync(process.execPath, [path.join(ROOT, 'scripts/editorial.js'), 'inspect', '--private-dir', f.privateDir, '--id', received.id], { encoding: 'utf8' });

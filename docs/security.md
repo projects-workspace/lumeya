@@ -14,30 +14,39 @@ The repository still contains private-platform UI and bot workflows for future w
 
 ## Public request intake
 
-`suggest_listing` and `looking_for` requests use the isolated `public_discovery_requests` table. Public roles cannot select from, update, or delete this table. The only browser permission is execution of `submit_public_discovery_request`, a validated insert-only `SECURITY DEFINER` function with an empty `search_path`.
+`suggest_listing` and `looking_for` requests use the isolated `public_discovery_requests` table. Public roles cannot select from, update, or delete this table. The M3 browser candidate calls `submit_idempotent_public_discovery_request`, a validated insert-only `SECURITY DEFINER` function with an empty `search_path`. The earlier ten-argument `submit_public_discovery_request` remains available for compatibility with older callers; it has no retry key and must not be used by new forms.
+
+The local migration candidate `0017_idempotent_public_discovery_requests.sql` adds a private nullable UUID key and partial unique index without changing existing rows or the separate IP/user-agent rate limit. An exact repeat with the same key and normalized request returns the original receipt ID. Reusing that key with changed content returns only a generic conflict; a different key creates a separate request. The key is not added to `source_page`, public exports or operator message text. This candidate has not been applied to any Supabase database.
 
 The browser validates required values, length, enum, and URL format. The database repeats those checks. A honeypot field provides basic automated-spam filtering. The RPC also limits a browser fingerprint to five requests per hour when proxy headers are available. This is containment, not a replacement for edge-level abuse protection.
 
-Form values are not autosaved while the user types. If a send attempt fails, the current values are saved in that browser's `localStorage` for up to seven days. The user can copy the request and open the Telegram bot. Local drafts are not encrypted. Forms tell users not to submit passwords, payment data, medical records, or other sensitive information.
+Form values are not autosaved while the user types. Before an online attempt, the current values and stable retry key are saved in that browser's `localStorage` for up to seven days; online submission is blocked when storage cannot keep the key across a reload. An uncertain online receipt keeps the same key for retry and hides the Telegram send option until an operator checks for the first receipt. A changed payload is rejected under the previous key, then requires a new explicit submit to create a distinct request. Local drafts are not encrypted. Forms tell users not to submit passwords, payment data, medical records, or other sensitive information.
 
 Stored requests expire after 90 days. `delete_expired_public_discovery_requests` is callable only by the service role and must be scheduled by the production operator. The bot claims pending notifications with `FOR UPDATE SKIP LOCKED`, sends them to `ADMIN_CHAT_ID`, and records success or retry state.
 
 ## Migration status
 
-Migration `0016_public_discovery_security.sql` was applied on 31 August 2026 to
-Lumeya's dedicated project `ccwvyjszlrrluzplizsu`. Live verification confirmed
-that anonymous callers can read published services, cannot read the request
-table or private platform tables, and can submit through only the validated
-request RPC. One disposable request was submitted and removed.
+Migration `0016_public_discovery_security.sql` was reported applied on 31 August 2026 to
+Lumeya's dedicated project `ccwvyjszlrrluzplizsu`. That is historical evidence:
+live verification at that time confirmed anonymous callers could read published
+services, could not read the request table or private platform tables, and could
+submit through the validated request RPC. One disposable request was submitted
+and removed. Current M3 read-only checks again confirmed anonymous request-table
+read denial, but no current valid RPC call was made.
 
 The historical remote migration table is empty even though legacy schema
 objects already exist. Treat `bot/schema.sql` and migrations `0002`–`0015` as a
-legacy reconstruction chain; normalize that history before expanding the live
-backend. Migration `0016` is idempotent and remains the authoritative public-MVP
-security boundary.
+legacy reconstruction chain; do not reset/replay it on the live database.
+Migration `0017` is an unapplied local candidate in the existing `bot/migrations`
+chain. Supabase project/branch management reads were denied, so an existing
+isolated test branch could not be identified or proven non-production. No
+migration or request write ran during M3.
 
-The live notification worker and retention cleanup still require a continuously
-running bot/server environment with its separately configured service-role key.
+The source has a notification worker that calls `claim_public_discovery_requests`
+in batches, sends the request to `ADMIN_CHAT_ID`, and records notified/failed
+state. Migration 0016 limits claim attempts and defines service-role-only
+90-day expiry cleanup. A running worker, successful Telegram delivery and an
+active cleanup schedule remain unverified and require external activation.
 
 ## Bot environment
 
