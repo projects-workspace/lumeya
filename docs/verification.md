@@ -311,3 +311,42 @@ Mapped Vercel project `lumeya` / `prj_Iwc9kpFxjbxfItBYjnD2SeKfkuAQ` in Our Proje
 Hosted worker/expiry definitions and grants are verified, with batch default 20, SKIP LOCKED claims, 15-minute reclaim and eight-attempt cap. Actual bot hosting, uptime, Telegram delivery and any external retention caller/execution remain unknown. No bot process, notification or cleanup started. An expiry timestamp does not prove scheduled deletion.
 
 The existing rollout plan records completed prerequisites and the next separately authorized step: apply only 0017, verify ACL/index/PostgREST visibility, then authorize controlled receipts/delivery/cleanup and frontend release. The existing live harness rejects Production and requires a confirmed existing non-production target; it is optional and no new branch is assumed. Disable via empty shared runtime configuration while retaining M3 keyed forms and keys; do not roll intake back to legacy code. Missing-RPC behavior remains source-reviewed only. M1/M2 and prior local SQL/catalog/editorial/full verify results were retained without rerunning unchanged suites. This resumed pass changed documentation only; scoped whitespace and local Markdown-link target checks passed; the historical May plan was preserved byte-for-byte. No remote write, submission, migration application, Telegram message, push or deployment ran. M3 hosted end-to-end acceptance remains pending.
+
+## Authorized Production application, release and bounded E2E — 2026-10-01
+
+The user authorized only migration 0017 in Production, the current frontend release and necessary bounded hosted E2E without new services/features. Current turn metadata reports `gpt-6.1-sol` / `high`. M1/M2 and the accepted local SQL reconstruction tests were retained. No runtime, cloud branch, paid API, account or credential was created/extracted.
+
+### Backend application
+
+Fresh read-only catalog metadata matched the prior scoped prerequisite snapshot exactly. The existing mapped Profile 1 owned Full Screen window and Lumeya `ccwvyjszlrrluzplizsu`, `main / Production`, were verified. The complete repository 0017 text was entered in the existing SQL Editor; length 10,663 bytes and a whole-text comparison digest `360fb2b6` matched the local file before Run. The transaction completed with Success. No rows returned. Only 0017 DDL ran; no old chain replay, reset or other function/schema addition occurred. SQL Editor execution does not register a CLI migration-history entry; the history schema/table were absent beforehand.
+
+Post-application read-only checks found 21 columns and five valid indexes, including the nullable UUID key and partial unique retry index. The keyed/legacy RPCs are postgres-owned Definer functions with empty search paths and postgres/service_role/anon/authenticated execution. The internal helper is Invoker with an empty path and postgres/service_role execution only. No PUBLIC execution grant appeared. Browser table/column CRUD remained denied and RLS remained enabled without policies; claim/expiry definitions and restricted grants were retained.
+
+### Real hosted calls and receipt persistence
+
+A temporary local Node script reused only the existing public config/publishable key and a marked synthetic user-agent/contact set; it did not read bot secrets or weaken the existing non-production harness. A sandbox DNS failure occurred before any call, then the authorized network path succeeded. Actual PostgREST results:
+
+| Check | Result |
+| --- | --- |
+| First keyed request / exact sequential retry | HTTP 200; same UUID receipt |
+| Same key, changed payload | HTTP 400, P0001/idempotency_key_conflict; no detail/hint; original intact |
+| Distinct key / simultaneous same-key calls | Separate receipt / both concurrent calls returned one matching receipt |
+| Legacy ten-argument call | HTTP 200; one compatible legacy row with null retry key |
+| Separate fingerprint rate limit | Five requests admitted; sixth rejected with rate_limited |
+| Invalid subject | HTTP 400/invalid_subject; no extra row |
+| Anonymous private read / direct update / helper | HTTP 401/42501 for each |
+| Exact synthetic database inspection | Five API rows, four unique non-null keys, one legacy row; original payload intact; expiry defaults exactly 90 days |
+
+One additional production browser request was submitted through the published Deep Massage → Ivan Protinyak → Santiago Studio → request route, with an explicitly synthetic topic/details and an example.invalid reply contact. The UI confirmed a saved receipt; an exact UUID/contact-filtered database read found one corresponding row and the unchanged payload. This is browser → PostgREST → persisted database evidence, not proof of operator delivery. All six synthetic rows were pending/unclaimed with zero notification attempts; the API rows were observed at approximately 640 seconds old and the browser row at 197 seconds old. No worker host/process was identified or started, no separate Telegram message was sent, and no broad retention cleanup ran. Supabase pg_cron remains absent and the mapped Vercel project has no configured jobs. The 90-day timestamp contract passed; automatic deletion remains unverified.
+
+Exact six-row cleanup is prepared and awaiting the CUA policy's action-time confirmation for irreversible browser deletion. The API test marker is `353896ed-53ec-4d24-b19d-4e8633b32f70`; its source/contact filters are `/m3-release-check/353896ed-53ec-4d24-b19d-4e8633b32f70` and `lumeya-check-353896ed-53ec-4d24-b19d-4e8633b32f70@example.invalid`. The browser row is `c6cdadb5-6263-4861-8820-cb40fde32717`, contact `lumeya-browser-m3-353896ed@example.invalid`. Cleanup additionally restricts the API rows to their five observed UUIDs: `5990e117-e16a-4e69-86bc-a56d5ecc17f6`, `4e1d1701-4974-4731-a88f-7c6ac7a2fc66`, `2f0fb87d-73ad-44ea-9710-d93f3f49b35f`, `7ded6d39-4aa9-4f52-89ae-0d37f8d21457`, `4355f28e-6f1d-4dc3-a40b-de9f0bf5e7f6`. No other row set is authorized by that prepared query.
+
+### Frontend release and checks
+
+`catalog:validate` passed; `verify` passed its included catalog:check, all 11 editorial/events tests and all 10 release checks (`fetched=40`). The first sandbox attempt could not bind loopback (EPERM); the permitted loopback execution passed. No code correction was needed. Unchanged prior desktop/mobile/keyboard QA remains dated, separate from this new hosted desktop receipt check.
+
+The RC branch was normally pushed to `d0eda610f4653610aee2e69edfad24cc58508c24`. Vercel's legacy repository route resolved over SSH to the same delivery SHA. A manual Preview creation was rejected by automatic approval review because the later release instruction did not explicitly name Preview; no Preview was created and that action was not retried. The explicitly authorized direct Production alternative used a verified normal fast-forward of main (its previous head was an ancestor), then the existing Deploy to Production UI after it resolved main to the exact release SHA. No force-push or branch/project setting change ran. SSH readback confirmed both main and the RC branch at the release SHA.
+
+Production deployment `2ZLPDXpaQwgt8PbZ8nd6BiCM5qj8`, URL `https://lumeya-jwg2lmgjw-andrij-projects.vercel.app`, is Ready/Current, source main/d0eda61, with a 41-second deployment duration. The primary alias `https://lumeya-wellbeing-discovery.vercel.app` served twelve exact release-source byte matches: index, services, masters, map, events, about, join, suggest, public-forms.js, public-config.js, discovery-data.js and home-events.js, all HTTP 200. Excluded scripts/editorial.js, content-source/published/catalog.json and bot/bot.js returned 404. Join rendered its configured intake state; Events rendered a valid empty upcoming schedule and the undated formats. Checked desktop pages had no horizontal overflow at 1512 pixels; observed console error count was zero. No real provider, listing correction or catalogue publication was submitted.
+
+Current frontend and hosted receipt checks passed. Remaining operational acceptance is actual worker/admin delivery and retention execution on an identified existing runtime, plus the pending exact synthetic cleanup. The [existing plan](superpowers/specs/2026-05-13-platform-next-work-plan.md#next-unfinished-work-and-release-sequence) records that single next task and the retained keyed-form disable/rollback route.
