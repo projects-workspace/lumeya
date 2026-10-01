@@ -16,7 +16,7 @@ The repository still contains private-platform UI and bot workflows for future w
 
 `suggest_listing` and `looking_for` requests use the isolated `public_discovery_requests` table. Public roles cannot select from, update, or delete this table. The M3 browser candidate calls `submit_idempotent_public_discovery_request`, a validated insert-only `SECURITY DEFINER` function with an empty `search_path`. The earlier ten-argument `submit_public_discovery_request` remains available for compatibility with older callers; it has no retry key and must not be used by new forms.
 
-Migration `0017_idempotent_public_discovery_requests.sql` adds a private nullable UUID key and partial unique index without changing existing rows or the separate IP/user-agent rate limit. An exact repeat with the same key and normalized request returns the original receipt ID. Reusing that key with changed content returns only a generic conflict; a different key creates a separate request. The key is not added to `source_page`, public exports or operator message text. The actual SQL has been executed only in a disposable local Supabase PostgreSQL database; no hosted database has been changed.
+Migration `0017_idempotent_public_discovery_requests.sql` adds a private nullable UUID key and partial unique index without changing existing rows or the separate IP/user-agent rate limit. An exact repeat with the same key and normalized request returns the original receipt ID. Reusing that key with changed content returns only a generic conflict; a different key creates a separate request. The key is not added to `source_page`, public exports or operator message text. M3 executed the actual SQL only in disposable local Supabase PostgreSQL databases and performed no hosted application. The 2026-10-01 hosted public Functions list lacks the keyed endpoint/helper; the complete table and grant prerequisites remain unread.
 
 The browser validates required values, length, enum, and URL format. The database repeats those checks. A honeypot field provides basic automated-spam filtering. The RPC also limits a browser fingerprint to five requests per hour when proxy headers are available. This is containment, not a replacement for edge-level abuse protection.
 
@@ -41,9 +41,11 @@ On 2026-10-01, the actual 0017 SQL ran successfully in an isolated database
 inside an already-running local Supabase PostgreSQL 17.6 container. Its minimal
 pre-0017 request table was reconstructed from the documented 0016 table
 definition and contained one synthetic legacy row. The database was removed
-after checks. This does not prove the hosted schema matches that reconstruction,
-and 0017 remains unapplied to hosted Supabase. No hosted mutation ran in this
-pass.
+after checks. This does not prove the hosted schema matches that reconstruction.
+The later hosted read-only checkpoint verified the exact account/project
+overview and public function names/signatures/Definer modes. The keyed endpoint
+and internal helper were absent from that list. Complete definitions, ACLs and
+table prerequisites remain unknown. No hosted mutation ran in either pass.
 
 The source has a notification worker that calls `claim_public_discovery_requests`
 in batches, sends the request to `ADMIN_CHAT_ID`, and records notified/failed

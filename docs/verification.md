@@ -134,7 +134,7 @@ Run this path on the current public URL after confirming which build is deployed
 
 When the M2 deployment and hosted intake are verified, test as a guest in current desktop Chrome/Firefox/Safari and a 375 px mobile viewport. Check search/no-match and category reset, the service-to-provider/place/format route, contact recipient and next step, keyboard skip-link/menu/focus return, and absence of horizontal overflow. Confirm unavailable versus empty versus unconfigured messages. The `join.html` provider form should receive only real public listing information; never submit an invented provider for a production test.
 
-For tester comments, use the existing `suggest.html#looking-for` form. Set Topic to **“Lumeya MVP feedback”** and describe the page, action, expected/observed result, browser/device/viewport, and keyboard step if relevant. Leave location empty unless it matters. Add a reply contact only if a response is wanted. Do not submit medical histories, client records, credentials, financial details, or another person's contact data. This form currently needs `submit_public_discovery_request` and an operator/worker path; do not use it for test feedback until release and hosted delivery are confirmed. Copy/open-Telegram controls do not send a message by themselves.
+For tester comments, use the existing `suggest.html#looking-for` form. Set Topic to **“Lumeya MVP feedback”** and describe the page, action, expected/observed result, browser/device/viewport, and keyboard step if relevant. Leave location empty unless it matters. Add a reply contact only if a response is wanted. Do not submit medical histories, client records, credentials, financial details, or another person's contact data. The M3 candidate requires `submit_idempotent_public_discovery_request` and a verified operator/worker path; the current older hosted script still calls the legacy endpoint. Do not use either deployment for live test feedback until its release and hosted delivery are authorized and confirmed. Copy/open-Telegram controls do not send a message by themselves.
 
 ### Limitations and release blockers
 
@@ -146,7 +146,7 @@ For tester comments, use the existing `suggest.html#looking-for` form. Set Topic
 
 No hosted form submission, Telegram message, migration, deployment or release-triggering push ran during the current pass. [Vercel documents automatic deployments for connected Git pushes](https://vercel.com/docs/git); the mapped project settings confirm `main` as Production Branch. Pushing the current M2 candidate there would publish it. The remote delivery branch still has M1-era commit `eb0fda8`, while local M2 is at `b86d2fd`. M3 remains pending until the hosted schema is checked, 0017 is applied through an authorized path, hosted retries are safely verified, operator delivery/retention are verified, Production release is explicitly authorized, and the resulting production URL is checked on desktop and mobile.
 
-## M3 local idempotency candidate — 2026-10-01
+## M3 accepted local SQL checkpoint — 2026-10-01
 
 The retry defect has a local implementation candidate. Additive migration
 `bot/migrations/0017_idempotent_public_discovery_requests.sql` adds a private
@@ -172,7 +172,7 @@ matches the reconstructed baseline.
 
 SQL assertions passed for the migration and partial unique index; sequential
 same-key calls in separate committed anonymous sessions returning one receipt
-and one row; two overlapping anonymous RPC sessions returning that same receipt;
+and one row; two overlapping anonymous RPC sessions returning a matching receipt;
 changed content returning only `idempotency_key_conflict` with no error detail
 or hint and leaving the original row intact; distinct keys creating separate
 rows; and the separate fingerprint limit admitting five distinct keys and
@@ -192,7 +192,7 @@ same retry key, and withholds manual Telegram sending; it does not call the
 legacy duplicate-prone RPC or report a saved receipt. This was a code-path
 review, not a hosted or browser execution with 0017 absent.
 
-No hosted database was read or changed in this pass. The earlier hosted access
+No hosted database was read or changed during the local SQL pass. The earlier hosted access
 limitations remain as recorded in the release-blocker notes above; an isolated
 cloud branch is optional and must not be created for this work. A hosted write
 test requires an already existing, positively verified non-production target
@@ -202,8 +202,85 @@ grant contract and that the legacy ten-argument RPC is present. Apply only
 migration 0017 through an authorized path; if the schema differs, stop rather
 than replaying older migrations. Verify the hosted RPC before publishing the
 client. If the RPC is missing or fails, keep the existing unavailable/contact behavior and do not
-fall back to the legacy RPC. For rollback, disable or revert the client while
-leaving the additive migration and existing data intact; do not remove the
-retry key or index to work around a client problem. Hosted receipt behavior,
+fall back to the legacy RPC. For rollback, disable online intake using the
+existing empty runtime configuration; a pre-M3 asset rollback alone restores
+the duplicate-prone legacy endpoint. Leave the additive migration and existing
+data intact; do not remove the retry key or index to work around a client problem.
+The exact disable route and release order are in the existing milestone plan. Hosted receipt behavior,
 worker delivery/failure handling, the 90-day cleanup schedule and deployment
 remain unverified. M3 remains pending and no Production release ran.
+
+## Hosted read-only compatibility checkpoint — 2026-10-01
+
+The current turn metadata reports `gpt-6.1-sol` with `high` effort. HEAD was
+`28e6513`; M1/M2 and the local SQL checkpoint were preserved without rerunning
+their suites. No database mutation, private-row read, mutation-function call,
+form submission, Telegram message, push or deployment occurred.
+
+The Mac was unlocked. The existing mapped Supabase Chrome profile entered a
+named native Full Screen window; the live Supabase account menu matched the
+private mapping, and the overview identified Lumeya's exact
+`ccwvyjszlrrluzplizsu` ref and `main / PRODUCTION`. It reported Healthy,
+NANO compute and “No migrations.” These are routing/overview facts; they do not
+prove the request table or functions. After the user foregrounded Functions,
+the unfiltered public-schema list showed `submit_public_discovery_request` with
+the existing ten-text-argument signature returning UUID, and the claim and expiry
+functions, all as Definer. It showed neither the keyed RPC nor the internal
+helper. A function metadata panel exposed only fragments of the legacy body;
+no function value was edited or saved. The new-client endpoint requirement is
+therefore incompatible with the observed hosted function list. The underlying
+table compatibility for migration 0017 remains **unknown**.
+
+Native page/definition capture continued to fail after navigation, and the
+extension API could not load its request-header policy. The SQL Editor's
+current save mode could not be verified. Supabase's dated
+[2025 save-behavior discussion](https://github.com/orgs/supabase/discussions/39793)
+describes automatic snippet saving and a manual-saving proposal; it is not
+proof of this account's current mode. No SQL was entered, run or saved, so no
+snippet-persistence side effect was introduced. Previously denied Supabase
+connector operations were not repeated. Required columns/constraints/indexes,
+complete RPC definitions/owners/ACLs, RLS/policies/search paths, migration
+history and retention jobs remain unread. No local SQL compatibility change is
+supported by the evidence.
+
+Public GETs to `https://lumeya-wellbeing-discovery.vercel.app` confirmed:
+
+| Resource | Current result |
+| --- | --- |
+| Homepage, Services and Events HTML | HTTP 200; SHA-256 byte comparisons matched local `eb0fda8`, not current HEAD |
+| `discovery-data.js`, `services.js`, `public-forms.js` | HTTP 200; byte comparisons matched `eb0fda8`; the form script contains no keyed RPC |
+| `auth.js` | HTTP 200; matches both `eb0fda8` and current HEAD |
+| `join.html` | HTTP 404 |
+| Current Services/Events assets | `discovery-data.js?v=1`, `services.js?v=4`, `events.js?v=4` |
+
+These public reads establish served content, not the deployment's exact Git SHA,
+Production Branch setting or Events execution. No new Events REST query or
+rendered Events behavior was proven; the earlier empty API result remains dated.
+The mapped Vercel profile's native Full Screen window opened the exact project
+overview, but its body was likewise unreadable. A direct alias deployment lookup
+returned connector “Deployment not found,” although the public alias serves
+HTTP 200. The exact-project tool has conflicting `projectId`/`idOrName`
+validation requirements and produced no metadata. No denied project-list call
+was repeated. The last dashboard evidence for Production Branch `main` and SHA
+`eb0fda8` remains the 2026-09-30 observation.
+
+Worker **source** is present: polling starts after successful `bot.launch()`,
+defaults to 60 seconds, claims 20 rows and records notification success/failure;
+the migration caps claims at eight. Worker **configuration** and **execution**
+were not established: no bot-host/runtime mapping or scheduler manifest is
+configured in the inspected repository, the static Vercel boundary excludes
+`bot/`, and the GitHub workflow runs verification only. Existing local Node
+processes could not be identified as the bot from the safe process evidence.
+The retention RPC exists in source with a service-role-only grant and 90-day
+expiry; no repository caller/schedule was found. The hosted claim and expiry
+function names/Definer modes were read, but their full definitions and grants
+were not. Worker deployment/delivery, active retention scheduling and actual
+execution remain unverified.
+No local environment secrets were read and no process or cleanup was started.
+
+The [existing milestone plan](superpowers/specs/2026-05-13-platform-next-work-plan.md#next-unfinished-work-and-release-sequence)
+is the single procedural release handoff. Hosted compatibility reads remain the
+next unfinished step. The user's foreground action restored a partial Functions
+read. The remaining access action is to restore this chat's existing Chrome
+browser-control connection/request-header-policy loading, preserving the same
+mapped accounts and permissions, so stable metadata reads can resume.
